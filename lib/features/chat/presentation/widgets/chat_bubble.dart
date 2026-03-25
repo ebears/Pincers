@@ -84,6 +84,7 @@ class _BubbleContent extends StatelessWidget {
           : MarkdownBody(
               data: message.content,
               styleSheet: buildMarkdownStyleSheet(),
+              builders: buildCodeBlockBuilders(),
               selectable: true,
             ),
     );

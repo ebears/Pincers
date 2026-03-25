@@ -112,6 +112,7 @@ class _ThreadListState extends ConsumerState<ThreadList> {
                     final thread = items[remaining];
                     return ThreadItem(
                       key: ValueKey(thread.id),
+                      staggerIndex: remaining,
                       thread: thread,
                       isSelected: thread.id == selectedId,
                       onTap: () => _selectThread(thread),

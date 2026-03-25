@@ -60,8 +60,20 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                         ),
                       ),
                     ),
-                    // Chat area
-                    const Expanded(child: ChatArea()),
+                    // Chat area with swipe-right to reveal sidebar on mobile
+                    Expanded(
+                      child: GestureDetector(
+                        onHorizontalDragEnd: !isTablet
+                            ? (details) {
+                                if (details.primaryVelocity != null &&
+                                    details.primaryVelocity! > 300) {
+                                  setState(() => _sidebarVisible = true);
+                                }
+                              }
+                            : null,
+                        child: const ChatArea(),
+                      ),
+                    ),
                   ],
                 ),
                 // Settings panel overlay

@@ -1,51 +1,84 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-enum ConnectionStatus { disconnected, connecting, connected, error }
+enum ConnectionStatus { disconnected, connecting, connected, reconnecting, error }
 
 class WebSocketService {
   WebSocketChannel? _channel;
-  StreamController<Map<String, dynamic>>? _messageController;
+  final StreamController<Map<String, dynamic>> _messageController =
+      StreamController<Map<String, dynamic>>.broadcast();
+
   ConnectionStatus _status = ConnectionStatus.disconnected;
+  String? _gatewayUrl;
+  String? _token;
+  bool _intentionalDisconnect = false;
+  int _reconnectAttempt = 0;
+  Timer? _reconnectTimer;
+
+  void Function(ConnectionStatus)? onStatusChange;
 
   ConnectionStatus get status => _status;
-  Stream<Map<String, dynamic>>? get messages => _messageController?.stream;
+  Stream<Map<String, dynamic>> get messages => _messageController.stream;
+
+  void _setStatus(ConnectionStatus s) {
+    _status = s;
+    onStatusChange?.call(s);
+  }
 
   Future<void> connect(String gatewayUrl, String token) async {
-    _status = ConnectionStatus.connecting;
+    _intentionalDisconnect = false;
+    _reconnectAttempt = 0;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    _gatewayUrl = gatewayUrl;
+    _token = token;
+    await _doConnect();
+  }
 
-    _messageController?.close();
-    _messageController = StreamController<Map<String, dynamic>>.broadcast();
-
+  Future<void> _doConnect() async {
+    _setStatus(ConnectionStatus.connecting);
     try {
-      final uri = Uri.parse('$gatewayUrl/rpc');
-      _channel = WebSocketChannel.connect(
-        uri,
-        protocols: ['Bearer $token'],
-      );
-
+      final uri = Uri.parse('${_gatewayUrl!}/rpc');
+      _channel = WebSocketChannel.connect(uri, protocols: ['Bearer $_token']);
       await _channel!.ready;
-      _status = ConnectionStatus.connected;
-
+      _reconnectAttempt = 0;
+      _setStatus(ConnectionStatus.connected);
       _channel!.stream.listen(
         (data) {
           if (data is String) {
             final json = jsonDecode(data) as Map<String, dynamic>;
-            _messageController?.add(json);
+            _messageController.add(json);
           }
         },
         onError: (e) {
-          _status = ConnectionStatus.error;
+          _setStatus(ConnectionStatus.error);
+          if (!_intentionalDisconnect) _scheduleReconnect();
         },
         onDone: () {
-          _status = ConnectionStatus.disconnected;
+          if (_intentionalDisconnect) {
+            _setStatus(ConnectionStatus.disconnected);
+          } else {
+            _scheduleReconnect();
+          }
         },
+        cancelOnError: true,
       );
     } catch (e) {
-      _status = ConnectionStatus.error;
-      rethrow;
+      _setStatus(ConnectionStatus.error);
+      if (!_intentionalDisconnect) _scheduleReconnect();
     }
+  }
+
+  void _scheduleReconnect() {
+    _reconnectAttempt++;
+    final delaySecs = min(30, pow(2, _reconnectAttempt - 1).toInt());
+    _setStatus(ConnectionStatus.reconnecting);
+    _reconnectTimer?.cancel();
+    _reconnectTimer = Timer(Duration(seconds: delaySecs), () {
+      if (!_intentionalDisconnect) _doConnect();
+    });
   }
 
   Future<void> send(String method, Map<String, dynamic> params, {String? id}) async {
@@ -56,15 +89,17 @@ class WebSocketService {
       'jsonrpc': '2.0',
       'method': method,
       'params': params,
-      // ignore: use_null_aware_elements
-      if (id != null) 'id': id,
+      'id': ?id,
     });
     _channel!.sink.add(payload);
   }
 
   void disconnect() {
+    _intentionalDisconnect = true;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
     _channel?.sink.close();
     _channel = null;
-    _status = ConnectionStatus.disconnected;
+    _setStatus(ConnectionStatus.disconnected);
   }
 }

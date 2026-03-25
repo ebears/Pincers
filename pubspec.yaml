@@ -21,6 +21,10 @@ dependencies:
   intl: ^0.20.2
   google_fonts: ^6.2.1
   cupertino_icons: ^1.0.8
+  file_picker: ^8.0.0
+  mime: ^2.0.0
+  flutter_highlight: ^0.7.0
+  markdown: ^7.0.0
 
 dev_dependencies:
   flutter_test:

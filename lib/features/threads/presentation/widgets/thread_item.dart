@@ -10,6 +10,7 @@ class ThreadItem extends StatefulWidget {
   final bool isSelected;
   final VoidCallback onTap;
   final VoidCallback onDelete;
+  final int staggerIndex;
 
   const ThreadItem({
     super.key,
@@ -17,18 +18,46 @@ class ThreadItem extends StatefulWidget {
     required this.isSelected,
     required this.onTap,
     required this.onDelete,
+    this.staggerIndex = 0,
   });
 
   @override
   State<ThreadItem> createState() => _ThreadItemState();
 }
 
-class _ThreadItemState extends State<ThreadItem> {
+class _ThreadItemState extends State<ThreadItem>
+    with SingleTickerProviderStateMixin {
   bool _hovered = false;
+  late final AnimationController _controller;
+  late final Animation<double> _opacity;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 150),
+      vsync: this,
+    );
+    _opacity = _controller;
+    Future<void>.delayed(
+      Duration(milliseconds: widget.staggerIndex * AppConstants.threadStaggerMs),
+      () {
+        if (mounted) _controller.forward();
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
+    return FadeTransition(
+      opacity: _opacity,
+      child: MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       child: GestureDetector(
@@ -87,6 +116,7 @@ class _ThreadItemState extends State<ThreadItem> {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 }

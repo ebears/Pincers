@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
+import '../../features/chat/presentation/widgets/code_block_widget.dart';
 
 MarkdownStyleSheet buildMarkdownStyleSheet() {
   return MarkdownStyleSheet(
@@ -23,4 +24,8 @@ MarkdownStyleSheet buildMarkdownStyleSheet() {
       decorationColor: AppColors.accent,
     ),
   );
+}
+
+Map<String, MarkdownElementBuilder> buildCodeBlockBuilders() {
+  return {'code': CodeElementBuilder()};
 }
