@@ -1,0 +1,142 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_typography.dart';
+import '../../../../core/constants/app_constants.dart';
+import '../../../../core/utils/time_utils.dart';
+import '../../data/models/thread_model.dart';
+import '../providers/threads_provider.dart';
+import '../../../chat/presentation/providers/chat_provider.dart';
+import 'thread_item.dart';
+import 'thread_group_header.dart';
+
+class ThreadList extends ConsumerStatefulWidget {
+  const ThreadList({super.key});
+
+  @override
+  ConsumerState<ThreadList> createState() => _ThreadListState();
+}
+
+class _ThreadListState extends ConsumerState<ThreadList> {
+  final Set<String> _collapsedGroups = {'This Week', 'Earlier'};
+
+  void _toggleGroup(String label) {
+    setState(() {
+      if (_collapsedGroups.contains(label)) {
+        _collapsedGroups.remove(label);
+      } else {
+        _collapsedGroups.add(label);
+      }
+    });
+  }
+
+  Future<void> _createThread() async {
+    final thread = await ref.read(threadsProvider.notifier).createThread();
+    ref.read(selectedThreadIdProvider.notifier).state = thread.id;
+    ref.read(chatProvider.notifier).loadMessages(thread.id);
+  }
+
+  void _selectThread(ThreadModel thread) {
+    ref.read(selectedThreadIdProvider.notifier).state = thread.id;
+    ref.read(chatProvider.notifier).loadMessages(thread.id);
+  }
+
+  void _confirmDelete(String id) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.bgTertiary,
+        title: Text('Delete conversation?', style: AppTypography.threadTitle.copyWith(fontSize: 16)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final selectedId = ref.read(selectedThreadIdProvider);
+              await ref.read(threadsProvider.notifier).deleteThread(id);
+              if (selectedId == id) {
+                ref.read(selectedThreadIdProvider.notifier).state = null;
+              }
+            },
+            child: const Text('Delete', style: TextStyle(color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Map<String, List<ThreadModel>> _groupThreads(List<ThreadModel> threads) {
+    final groups = <String, List<ThreadModel>>{};
+    for (final t in threads) {
+      final label = TimeUtils.groupLabel(t.updatedAt);
+      groups.putIfAbsent(label, () => []).add(t);
+    }
+    return groups;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final threads = ref.watch(threadsProvider);
+    final selectedId = ref.watch(selectedThreadIdProvider);
+    final groups = _groupThreads(threads);
+    final sortedLabels = ['Today', 'Yesterday', 'This Week', 'Earlier']
+        .where((l) => groups.containsKey(l))
+        .toList();
+
+    return Column(
+      children: [
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.only(top: AppConstants.space8),
+            itemCount: sortedLabels.fold<int>(0, (sum, l) {
+              final collapsed = _collapsedGroups.contains(l);
+              return sum + 1 + (collapsed ? 0 : (groups[l]?.length ?? 0));
+            }),
+            itemBuilder: (context, index) {
+              int remaining = index;
+              for (final label in sortedLabels) {
+                if (remaining == 0) {
+                  return ThreadGroupHeader(
+                    label: label,
+                    isCollapsed: _collapsedGroups.contains(label),
+                    onToggle: () => _toggleGroup(label),
+                  );
+                }
+                remaining--;
+                if (!_collapsedGroups.contains(label)) {
+                  final items = groups[label] ?? [];
+                  if (remaining < items.length) {
+                    final thread = items[remaining];
+                    return ThreadItem(
+                      key: ValueKey(thread.id),
+                      thread: thread,
+                      isSelected: thread.id == selectedId,
+                      onTap: () => _selectThread(thread),
+                      onDelete: () => _confirmDelete(thread.id),
+                    );
+                  }
+                  remaining -= groups[label]!.length;
+                }
+              }
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(AppConstants.space12),
+          child: SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _createThread,
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('New conversation'),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
