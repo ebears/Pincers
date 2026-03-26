@@ -41,8 +41,6 @@ class AppHeader extends ConsumerWidget {
             style: AppTypography.threadTitle.copyWith(fontSize: 16, fontWeight: FontWeight.w600),
           ),
           const Spacer(),
-          const _UserAvatar(),
-          const SizedBox(width: AppConstants.space8),
           IconButton(
             icon: const Icon(Icons.settings_outlined, size: 20, color: AppColors.textSecondary),
             onPressed: () => ref.read(settingsProvider.notifier).togglePanel(),
@@ -56,19 +54,3 @@ class AppHeader extends ConsumerWidget {
   }
 }
 
-class _UserAvatar extends StatelessWidget {
-  const _UserAvatar();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 28,
-      height: 28,
-      decoration: const BoxDecoration(
-        color: AppColors.accent,
-        shape: BoxShape.circle,
-      ),
-      child: const Icon(Icons.person, size: 16, color: Colors.white),
-    );
-  }
-}
