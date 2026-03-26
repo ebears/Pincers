@@ -10,6 +10,7 @@ import '../../../../shared/widgets/empty_state.dart';
 import '../../data/models/message_model.dart';
 import '../../data/models/attachment_model.dart';
 import 'chat_bubble.dart';
+import 'chat_header.dart';
 import 'typing_indicator.dart';
 import 'input_area.dart';
 
@@ -93,6 +94,7 @@ class _ChatAreaState extends ConsumerState<ChatArea> {
 
     return Column(
       children: [
+        const ChatHeader(),
         Expanded(
           child: ListView.builder(
             controller: _scrollController,

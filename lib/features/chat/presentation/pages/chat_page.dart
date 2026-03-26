@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
@@ -7,6 +8,7 @@ import '../../../threads/presentation/providers/threads_provider.dart';
 import '../../../settings/presentation/providers/settings_provider.dart';
 import '../../../settings/presentation/widgets/settings_panel.dart';
 import '../../../../shared/widgets/app_header.dart';
+import '../providers/chat_provider.dart';
 import '../widgets/chat_area.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
@@ -18,6 +20,55 @@ class ChatPage extends ConsumerStatefulWidget {
 
 class _ChatPageState extends ConsumerState<ChatPage> {
   bool _sidebarVisible = true;
+  final FocusNode _keyboardFocus = FocusNode();
+
+  @override
+  void dispose() {
+    _keyboardFocus.dispose();
+    super.dispose();
+  }
+
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+
+    final ctrl = HardwareKeyboard.instance.isControlPressed ||
+        HardwareKeyboard.instance.isMetaPressed;
+
+    // Ctrl+N → new thread
+    if (ctrl && event.logicalKey == LogicalKeyboardKey.keyN) {
+      _newThread();
+      return KeyEventResult.handled;
+    }
+
+    // Ctrl+W → deselect thread
+    if (ctrl && event.logicalKey == LogicalKeyboardKey.keyW) {
+      ref.read(selectedThreadIdProvider.notifier).state = null;
+      return KeyEventResult.handled;
+    }
+
+    // Escape → close settings panel, or collapse sidebar on mobile/tablet
+    if (event.logicalKey == LogicalKeyboardKey.escape) {
+      final settingsOpen = ref.read(settingsProvider).isPanelOpen;
+      if (settingsOpen) {
+        ref.read(settingsProvider.notifier).togglePanel();
+        return KeyEventResult.handled;
+      }
+      final width = MediaQuery.of(context).size.width;
+      final isDesktop = width >= AppConstants.breakpointDesktop;
+      if (!isDesktop && _sidebarVisible) {
+        setState(() => _sidebarVisible = false);
+        return KeyEventResult.handled;
+      }
+    }
+
+    return KeyEventResult.ignored;
+  }
+
+  Future<void> _newThread() async {
+    final thread = await ref.read(threadsProvider.notifier).createThread();
+    ref.read(selectedThreadIdProvider.notifier).state = thread.id;
+    ref.read(chatProvider.notifier).loadMessages(thread.id);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,57 +82,65 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       _sidebarVisible = false;
     }
 
-    return Scaffold(
-      backgroundColor: AppColors.bgPrimary,
-      body: Column(
-        children: [
-          AppHeader(
-            showMenuButton: !isDesktop,
-            onMenuTap: () => setState(() => _sidebarVisible = !_sidebarVisible),
-          ),
-          Expanded(
-            child: Stack(
-              children: [
-                Row(
-                  children: [
-                    // Sidebar
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      width: (isDesktop || (isTablet && _sidebarVisible) || (!isTablet && _sidebarVisible))
-                          ? AppConstants.sidebarWidth
-                          : 0,
-                      child: OverflowBox(
-                        maxWidth: AppConstants.sidebarWidth,
-                        alignment: Alignment.centerLeft,
-                        child: Container(
-                          width: AppConstants.sidebarWidth,
-                          color: AppColors.bgSecondary,
-                          child: const ThreadList(),
+    return Focus(
+      focusNode: _keyboardFocus,
+      autofocus: true,
+      onKeyEvent: _handleKeyEvent,
+      child: Scaffold(
+        backgroundColor: AppColors.bgPrimary,
+        body: Column(
+          children: [
+            AppHeader(
+              showMenuButton: !isDesktop,
+              onMenuTap: () =>
+                  setState(() => _sidebarVisible = !_sidebarVisible),
+            ),
+            Expanded(
+              child: Stack(
+                children: [
+                  Row(
+                    children: [
+                      // Sidebar
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: (isDesktop ||
+                                (isTablet && _sidebarVisible) ||
+                                (!isTablet && _sidebarVisible))
+                            ? AppConstants.sidebarWidth
+                            : 0,
+                        child: OverflowBox(
+                          maxWidth: AppConstants.sidebarWidth,
+                          alignment: Alignment.centerLeft,
+                          child: Container(
+                            width: AppConstants.sidebarWidth,
+                            color: AppColors.bgSecondary,
+                            child: const ThreadList(),
+                          ),
                         ),
                       ),
-                    ),
-                    // Chat area with swipe-right to reveal sidebar on mobile
-                    Expanded(
-                      child: GestureDetector(
-                        onHorizontalDragEnd: !isTablet
-                            ? (details) {
-                                if (details.primaryVelocity != null &&
-                                    details.primaryVelocity! > 300) {
-                                  setState(() => _sidebarVisible = true);
+                      // Chat area with swipe-right to reveal sidebar on mobile
+                      Expanded(
+                        child: GestureDetector(
+                          onHorizontalDragEnd: !isTablet
+                              ? (details) {
+                                  if (details.primaryVelocity != null &&
+                                      details.primaryVelocity! > 300) {
+                                    setState(() => _sidebarVisible = true);
+                                  }
                                 }
-                              }
-                            : null,
-                        child: const ChatArea(),
+                              : null,
+                          child: const ChatArea(),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                // Settings panel overlay
-                if (settingsOpen) const SettingsPanel(),
-              ],
+                    ],
+                  ),
+                  // Settings panel overlay
+                  if (settingsOpen) const SettingsPanel(),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

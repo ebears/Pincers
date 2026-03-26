@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../data/models/message_model.dart';
@@ -14,13 +15,118 @@ class ChatNotifier extends StateNotifier<List<MessageModel>> {
   final ChatRepository _repo;
   final Ref _ref;
 
-  ChatNotifier(this._repo, this._ref) : super([]);
+  // Tracks in-progress streaming bot messages: threadId → messageId
+  final Map<String, String> _streamingIds = {};
+  // Accumulates streaming content per thread: threadId → content so far
+  final Map<String, StringBuffer> _streamingBuffers = {};
+
+  StreamSubscription<Map<String, dynamic>>? _messageSub;
+
+  ChatNotifier(this._repo, this._ref) : super([]) {
+    _messageSub = _ref
+        .read(gatewayProvider.notifier)
+        .messages
+        .listen(_handleGatewayMessage);
+  }
+
+  @override
+  void dispose() {
+    _messageSub?.cancel();
+    super.dispose();
+  }
+
+  // ── Incoming message routing ────────────────────────────────────────────────
+
+  void _handleGatewayMessage(Map<String, dynamic> msg) {
+    if (!mounted) return;
+
+    if (msg.containsKey('method')) {
+      // JSON-RPC notification
+      final method = msg['method'] as String;
+      final params = (msg['params'] as Map<String, dynamic>?) ?? {};
+      switch (method) {
+        case 'session.token':
+          _handleStreamToken(params);
+        case 'session.message':
+          // Non-streaming complete message via notification
+          final threadId = params['thread_id'] as String?;
+          final content = params['content'] as String?;
+          if (threadId != null && content != null) {
+            receiveBotMessage(threadId, content);
+          }
+      }
+    } else if (msg.containsKey('id') && msg.containsKey('result')) {
+      // JSON-RPC success response — treat as complete bot message
+      final result = (msg['result'] as Map<String, dynamic>?) ?? {};
+      final content = result['content'] as String?;
+      final threadId =
+          result['thread_id'] as String? ?? _ref.read(selectedThreadIdProvider);
+      if (content != null && threadId != null) {
+        receiveBotMessage(threadId, content);
+      }
+    }
+  }
+
+  void _handleStreamToken(Map<String, dynamic> params) {
+    final threadId = params['thread_id'] as String?;
+    final token = params['content'] as String? ?? '';
+    final done = params['done'] as bool? ?? false;
+
+    if (threadId == null) return;
+
+    // Dismiss typing indicator on first token
+    if (!_streamingIds.containsKey(threadId)) {
+      _ref.read(typingProvider.notifier).state = false;
+      final id = _uuid.v4();
+      _streamingIds[threadId] = id;
+      _streamingBuffers[threadId] = StringBuffer(token);
+      final partialMsg = MessageModel(
+        id: id,
+        threadId: threadId,
+        role: 'bot',
+        content: token,
+        attachments: const [],
+        createdAt: DateTime.now(),
+      );
+      state = [...state, partialMsg];
+    } else {
+      _streamingBuffers[threadId]!.write(token);
+      final id = _streamingIds[threadId]!;
+      final newContent = _streamingBuffers[threadId]!.toString();
+      state = [
+        for (final m in state)
+          if (m.id == id)
+            MessageModel(
+              id: m.id,
+              threadId: m.threadId,
+              role: m.role,
+              content: newContent,
+              attachments: m.attachments,
+              createdAt: m.createdAt,
+            )
+          else
+            m,
+      ];
+    }
+
+    if (done) {
+      final id = _streamingIds[threadId]!;
+      final finalMsg = state.firstWhere((m) => m.id == id);
+      _repo.saveMessage(finalMsg);
+      _streamingIds.remove(threadId);
+      _streamingBuffers.remove(threadId);
+      _ref.read(threadsProvider.notifier).touchThread(threadId);
+    }
+  }
+
+  // ── Public API ──────────────────────────────────────────────────────────────
 
   void loadMessages(String threadId) {
     state = _repo.getMessagesForThread(threadId);
   }
 
-  Future<void> sendMessage(String threadId, String content, {List<AttachmentModel> attachments = const []}) async {
+  Future<void> sendMessage(String threadId, String content,
+      {List<AttachmentModel> attachments = const []}) async {
     final msg = MessageModel(
       id: _uuid.v4(),
       threadId: threadId,
@@ -34,7 +140,8 @@ class ChatNotifier extends StateNotifier<List<MessageModel>> {
 
     // Update thread title from first message
     final threads = _ref.read(threadsProvider);
-    final thread = threads.firstWhere((t) => t.id == threadId, orElse: () => throw StateError('Thread not found'));
+    final thread = threads.firstWhere((t) => t.id == threadId,
+        orElse: () => throw StateError('Thread not found'));
     if (thread.title == 'New conversation') {
       final title = content.length > AppConstants.threadTitleMaxLength
           ? content.substring(0, AppConstants.threadTitleMaxLength)
@@ -51,7 +158,15 @@ class ChatNotifier extends StateNotifier<List<MessageModel>> {
         {
           'thread_id': threadId,
           'content': content,
-          if (attachments.isNotEmpty) 'attachments': attachments.map((a) => {'id': a.id, 'filename': a.filename, 'mime_type': a.mimeType, 'data': a.base64Data}).toList(),
+          if (attachments.isNotEmpty)
+            'attachments': attachments
+                .map((a) => {
+                      'id': a.id,
+                      'filename': a.filename,
+                      'mime_type': a.mimeType,
+                      'data': a.base64Data,
+                    })
+                .toList(),
         },
         id: msg.id,
       );
@@ -67,7 +182,7 @@ class ChatNotifier extends StateNotifier<List<MessageModel>> {
       threadId: threadId,
       role: 'bot',
       content: content,
-      attachments: [],
+      attachments: const [],
       createdAt: DateTime.now(),
     );
     await _repo.saveMessage(msg);
@@ -83,6 +198,7 @@ class ChatNotifier extends StateNotifier<List<MessageModel>> {
 
 final chatRepositoryProvider = Provider<ChatRepository>((ref) => ChatRepository());
 
-final chatProvider = StateNotifierProvider<ChatNotifier, List<MessageModel>>((ref) {
+final chatProvider =
+    StateNotifierProvider<ChatNotifier, List<MessageModel>>((ref) {
   return ChatNotifier(ref.watch(chatRepositoryProvider), ref);
 });
