@@ -10,6 +10,7 @@ import '../../../settings/presentation/widgets/settings_panel.dart';
 import '../../../../shared/widgets/app_header.dart';
 import '../providers/chat_provider.dart';
 import '../providers/gateway_provider.dart';
+import '../providers/agent_identity_provider.dart';
 import '../widgets/chat_area.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
@@ -23,6 +24,17 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   bool _sidebarVisible = true;
   final FocusNode _keyboardFocus = FocusNode();
   bool _connectAttempted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Eagerly initialize so the gateway listener is set up and the identity
+    // fetch fires as soon as the gateway connects — before any thread is
+    // selected or any message is sent.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(agentIdentityProvider);
+    });
+  }
 
   @override
   void dispose() {
