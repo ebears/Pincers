@@ -142,64 +142,87 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// Waits for the connect.challenge event, sends a connect request with the
   /// token, and verifies the gateway responds with hello-ok.
   Future<void> _performConnectHandshake(dynamic channel, String token) async {
-    final stream = channel.stream.map<Map<String, dynamic>>(
-      (data) => jsonDecode(data as String) as Map<String, dynamic>,
-    );
+    final messages = <Map<String, dynamic>>[];
+    final completer = Completer<void>();
 
-    // Wait for connect.challenge from the gateway.
-    final challenge = await stream.first.timeout(
-      const Duration(seconds: 10),
-      onTimeout: () => throw const AuthException(AuthFailureReason.timeout),
-    );
+    final sub = channel.stream.listen(
+      (data) {
+        final msg = jsonDecode(data as String) as Map<String, dynamic>;
+        messages.add(msg);
 
-    if (challenge['type'] != 'event' ||
-        challenge['event'] != 'connect.challenge') {
-      throw const AuthException(
-        AuthFailureReason.generic,
-        detail: 'Expected connect.challenge from gateway',
-      );
-    }
+        if (messages.length == 1) {
+          // First message: expect connect.challenge, then send connect request.
+          if (msg['type'] != 'event' || msg['event'] != 'connect.challenge') {
+            completer.completeError(const AuthException(
+              AuthFailureReason.generic,
+              detail: 'Expected connect.challenge from gateway',
+            ));
+            return;
+          }
 
-    // Send connect request with auth token.
-    final reqId = _uuid.v4();
-    channel.sink.add(jsonEncode({
-      'type': 'req',
-      'id': reqId,
-      'method': 'connect',
-      'params': {
-        'minProtocol': 3,
-        'maxProtocol': 3,
-        'client': {
-          'id': 'pincers',
-          'version': '1.0.0',
-          'platform': 'flutter',
-          'mode': 'operator',
-        },
-        'role': 'operator',
-        'scopes': ['operator.read', 'operator.write'],
-        'caps': [],
-        'commands': [],
-        'permissions': {},
-        'auth': {'token': token},
-        'locale': 'en-US',
-        'userAgent': 'pincers/1.0.0',
+          final reqId = _uuid.v4();
+          channel.sink.add(jsonEncode({
+            'type': 'req',
+            'id': reqId,
+            'method': 'connect',
+            'params': {
+              'minProtocol': 3,
+              'maxProtocol': 3,
+              'client': {
+                'id': 'pincers',
+                'version': '1.0.0',
+                'platform': 'flutter',
+                'mode': 'operator',
+              },
+              'role': 'operator',
+              'scopes': ['operator.read', 'operator.write'],
+              'caps': [],
+              'commands': [],
+              'permissions': {},
+              'auth': {'token': token},
+              'locale': 'en-US',
+              'userAgent': 'pincers/1.0.0',
+            },
+          }));
+        } else if (messages.length == 2) {
+          // Second message: expect hello-ok response.
+          if (msg['type'] == 'res' && msg['ok'] == true) {
+            completer.complete();
+          } else {
+            final error = msg['error'];
+            final errorMsg =
+                error is Map ? (error['message'] ?? '$error') : '$msg';
+            completer.completeError(
+              AuthException(AuthFailureReason.authRejected, detail: '$errorMsg'),
+            );
+          }
+        }
       },
-    }));
-
-    // Wait for the response.
-    final response = await stream.first.timeout(
-      const Duration(seconds: 10),
-      onTimeout: () => throw const AuthException(AuthFailureReason.timeout),
+      onError: (e) {
+        if (!completer.isCompleted) {
+          completer.completeError(
+            AuthException(AuthFailureReason.generic, detail: '$e'),
+          );
+        }
+      },
+      onDone: () {
+        if (!completer.isCompleted) {
+          completer.completeError(const AuthException(
+            AuthFailureReason.generic,
+            detail: 'Connection closed before handshake completed',
+          ));
+        }
+      },
     );
 
-    if (response['type'] == 'res' && response['ok'] == true) {
-      return; // hello-ok — token is valid
+    try {
+      await completer.future.timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => throw const AuthException(AuthFailureReason.timeout),
+      );
+    } finally {
+      await sub.cancel();
     }
-
-    // The gateway rejected the connect request.
-    final error = response['error'];
-    final errorMsg = error is Map ? (error['message'] ?? '$error') : '$response';
-    throw AuthException(AuthFailureReason.authRejected, detail: '$errorMsg');
   }
 
   Future<void> saveCredentials(
