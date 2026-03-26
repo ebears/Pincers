@@ -11,6 +11,7 @@ import '../../../../shared/widgets/app_header.dart';
 import '../providers/chat_provider.dart';
 import '../providers/gateway_provider.dart';
 import '../providers/agent_identity_provider.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../widgets/chat_area.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
@@ -23,18 +24,6 @@ class ChatPage extends ConsumerStatefulWidget {
 class _ChatPageState extends ConsumerState<ChatPage> {
   bool _sidebarVisible = true;
   final FocusNode _keyboardFocus = FocusNode();
-  bool _connectAttempted = false;
-
-  @override
-  void initState() {
-    super.initState();
-    // Eagerly initialize so the gateway listener is set up and the identity
-    // fetch fires as soon as the gateway connects — before any thread is
-    // selected or any message is sent.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(agentIdentityProvider);
-    });
-  }
 
   @override
   void dispose() {
@@ -43,8 +32,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   void _ensureGatewayConnected() {
-    if (_connectAttempted) return;
-    _connectAttempted = true;
+    final auth = ref.read(authProvider);
+    if (auth.isLoading || !auth.isAuthenticated) return;
     final status = ref.read(gatewayProvider).status;
     if (status == GatewayStatus.disconnected || status == GatewayStatus.error) {
       ref.read(gatewayProvider.notifier).connect();
@@ -95,7 +84,37 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Connect once auth finishes loading — needed because AuthNotifier loads
+    // credentials asynchronously (isLoading: true on first build).
+    ref.listen<AuthState>(authProvider, (prev, next) {
+      if (!next.isLoading && next.isAuthenticated) {
+        _ensureGatewayConnected();
+      }
+    });
+
+    // Immediate connect if auth is already available on first render.
     _ensureGatewayConnected();
+
+    // Trigger agent identity fetch as soon as the gateway connects (or
+    // reconnects). Widget-layer ref.listen is guaranteed to fire for every
+    // state change, making this more reliable than a listener inside the
+    // provider factory.
+    ref.listen<GatewayState>(gatewayProvider, (_, next) {
+      if (next.status == GatewayStatus.connected) {
+        ref
+            .read(agentIdentityProvider.notifier)
+            .fetchIfNeeded(next.hello?.connId);
+      }
+    });
+
+    // Also handle the case where the gateway is already connected when this
+    // page first renders (ref.listen only fires on future changes).
+    final currentGateway = ref.read(gatewayProvider);
+    if (currentGateway.status == GatewayStatus.connected) {
+      ref
+          .read(agentIdentityProvider.notifier)
+          .fetchIfNeeded(currentGateway.hello?.connId);
+    }
 
     final width = MediaQuery.of(context).size.width;
     final isDesktop = width >= AppConstants.breakpointDesktop;

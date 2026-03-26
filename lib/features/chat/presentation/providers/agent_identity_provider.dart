@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'gateway_provider.dart';
@@ -67,27 +69,37 @@ String? _wsUrlToHttpBase(String wsUrl) {
 class AgentIdentityNotifier extends StateNotifier<AgentIdentity> {
   final Ref _ref;
 
-  /// Tracks the last connId we fetched for, to avoid redundant fetches.
+  /// connId for which a fetch has successfully completed.
   String? _lastFetchedConnId;
 
-  AgentIdentityNotifier(this._ref) : super(AgentIdentity.defaultIdentity) {
-    // Fetch on first build if already connected.
-    _maybeFetch(_ref.read(gatewayProvider));
+  /// Prevents overlapping concurrent fetches.
+  bool _fetchInProgress = false;
+
+  /// Retry timer used when a fetch fails transiently.
+  Timer? _retryTimer;
+
+  AgentIdentityNotifier(this._ref) : super(AgentIdentity.defaultIdentity);
+
+  @override
+  void dispose() {
+    _retryTimer?.cancel();
+    super.dispose();
   }
 
-  void onGatewayState(GatewayState gatewayState) {
-    _maybeFetch(gatewayState);
+  /// Called from the widget layer when the gateway becomes (or stays) connected.
+  /// Safe to call on every rebuild — no-ops if we already have a result for
+  /// this connection or a fetch is already underway.
+  void fetchIfNeeded(String? connId) {
+    if (connId == null) return;
+    if (connId == _lastFetchedConnId) return; // already succeeded
+    if (_fetchInProgress) return; // in flight
+    _retryTimer?.cancel();
+    _retryTimer = null;
+    _fetchInProgress = true;
+    _fetch(connId);
   }
 
-  Future<void> _maybeFetch(GatewayState gatewayState) async {
-    if (gatewayState.status != GatewayStatus.connected) return;
-    final connId = gatewayState.hello?.connId;
-    if (connId == null || connId == _lastFetchedConnId) return;
-    _lastFetchedConnId = connId;
-    await _fetch();
-  }
-
-  Future<void> _fetch() async {
+  Future<void> _fetch(String connId) async {
     try {
       final result = await _ref
           .read(gatewayProvider.notifier)
@@ -98,6 +110,11 @@ class AgentIdentityNotifier extends StateNotifier<AgentIdentity> {
       final avatar = result['avatar'] as String? ?? 'A';
       final emoji = result['emoji'] as String?;
 
+      // Mark success before updating state so any triggered rebuild sees the
+      // connId already recorded and doesn't schedule a duplicate fetch.
+      _lastFetchedConnId = connId;
+      _fetchInProgress = false;
+
       state = AgentIdentity(
         agentId: agentId,
         name: name,
@@ -106,18 +123,20 @@ class AgentIdentityNotifier extends StateNotifier<AgentIdentity> {
       );
       debugPrint('[Pincers] Agent identity: name=$name avatar=$avatar');
     } catch (e) {
-      debugPrint('[Pincers] agent.identity.get failed (non-fatal): $e');
-      // Keep whatever state we have (default or previously fetched).
+      debugPrint('[Pincers] agent.identity.get failed: $e — retrying in 3s');
+      _fetchInProgress = false;
+      // Retry after a short delay; only if the connection is still the same.
+      _retryTimer = Timer(const Duration(seconds: 3), () {
+        _retryTimer = null;
+        final currentConnId = _ref.read(gatewayProvider).hello?.connId;
+        if (currentConnId == connId) fetchIfNeeded(connId);
+      });
     }
   }
 }
 
 final agentIdentityProvider =
     StateNotifierProvider<AgentIdentityNotifier, AgentIdentity>((ref) {
-  final notifier = AgentIdentityNotifier(ref);
-  // Re-fetch whenever the gateway state changes (handles reconnect).
-  ref.listen<GatewayState>(gatewayProvider, (_, next) {
-    notifier.onGatewayState(next);
-  });
-  return notifier;
+  return AgentIdentityNotifier(ref);
 });
+

@@ -81,6 +81,9 @@ class _ImageAvatar extends StatelessWidget {
         width: size,
         height: size,
         fit: BoxFit.cover,
+        // Show text placeholder while loading so the space is never blank.
+        loadingBuilder: (_, child, progress) =>
+            progress == null ? child : _TextAvatar(label: fallbackLabel, size: size),
         errorBuilder: (_, _, _) => _TextAvatar(label: fallbackLabel, size: size),
       ),
     );
