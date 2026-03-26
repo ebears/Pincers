@@ -105,7 +105,7 @@ class ChatNotifier extends StateNotifier<List<MessageModel>> {
 
     if (!_streamingIds.containsKey(runId)) {
       // First delta: dismiss typing indicator, create placeholder message.
-      _ref.read(typingProvider.notifier).state = false;
+      _ref.read(typingProvider(threadId).notifier).state = false;
       final id = _uuid.v4();
       _streamingIds[runId] = id;
       _streamingBuffers[runId] = StringBuffer(content);
@@ -141,7 +141,7 @@ class ChatNotifier extends StateNotifier<List<MessageModel>> {
 
   void _handleFinal(
       String runId, String threadId, Map<String, dynamic>? message) {
-    _ref.read(typingProvider.notifier).state = false;
+    _ref.read(typingProvider(threadId).notifier).state = false;
 
     final content = _stripTrailingTag(_extractContent(message));
 
@@ -191,7 +191,7 @@ class ChatNotifier extends StateNotifier<List<MessageModel>> {
   }
 
   void _handleErrorOrAbort(String runId, String threadId, Map<String, dynamic> payload) {
-    _ref.read(typingProvider.notifier).state = false;
+    _ref.read(typingProvider(threadId).notifier).state = false;
 
     final eventState = payload['state'] as String?;
     final errorMsg = (payload['error'] as Map<String, dynamic>?)?['message'] as String?
@@ -474,7 +474,7 @@ class ChatNotifier extends StateNotifier<List<MessageModel>> {
     await _ref.read(threadsProvider.notifier).touchThread(threadId);
 
     // Show typing indicator.
-    _ref.read(typingProvider.notifier).state = true;
+    _ref.read(typingProvider(threadId).notifier).state = true;
 
     try {
       // Wait for gateway connection if still connecting.
@@ -506,7 +506,7 @@ class ChatNotifier extends StateNotifier<List<MessageModel>> {
     } catch (e) {
       debugPrint('[Pincers] Send failed: $e');
       // On send failure, hide typing. Error is surfaced to UI via the throw.
-      _ref.read(typingProvider.notifier).state = false;
+      _ref.read(typingProvider(threadId).notifier).state = false;
       rethrow;
     }
   }
@@ -533,7 +533,7 @@ class ChatNotifier extends StateNotifier<List<MessageModel>> {
   }
 
   Future<void> _receiveBotMessage(String threadId, String content) async {
-    _ref.read(typingProvider.notifier).state = false;
+    _ref.read(typingProvider(threadId).notifier).state = false;
     final msg = MessageModel(
       id: _uuid.v4(),
       threadId: threadId,

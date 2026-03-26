@@ -147,6 +147,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                       // Sidebar
                       AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
+                        clipBehavior: Clip.hardEdge,
+                        decoration: const BoxDecoration(),
                         width: (isDesktop ||
                                 (isTablet && _sidebarVisible) ||
                                 (!isTablet && _sidebarVisible))

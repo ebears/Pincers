@@ -86,27 +86,41 @@ class _ChatAreaState extends ConsumerState<ChatArea> {
   @override
   Widget build(BuildContext context) {
     final selectedId = ref.watch(selectedThreadIdProvider);
-    final messages = ref.watch(chatProvider);
-    final isTyping = ref.watch(typingProvider);
+    final allMessages = ref.watch(chatProvider);
+    final isTyping =
+        selectedId != null && ref.watch(typingProvider(selectedId));
     final gatewayStatus = ref.watch(gatewayProvider).status;
     final verboseMode = ref.watch(verboseModeProvider);
 
+    // Only show messages belonging to the active thread.
+    final threadMessages = selectedId == null
+        ? const <MessageModel>[]
+        : allMessages.where((m) => m.threadId == selectedId).toList();
+
     // Only show verbose entries when the toggle is on.
     final displayMessages = verboseMode
-        ? messages
-        : messages.where((m) => !m.isVerbose).toList();
+        ? threadMessages
+        : threadMessages.where((m) => !m.isVerbose).toList();
 
     ref.listen<List<MessageModel>>(chatProvider, (prev, next) {
-      _scrollToBottom();
-      if (prev != null && next.length > prev.length) {
+      if (selectedId == null) return;
+      final prevFiltered =
+          prev?.where((m) => m.threadId == selectedId).toList() ?? [];
+      final nextFiltered =
+          next.where((m) => m.threadId == selectedId).toList();
+      if (nextFiltered.length > prevFiltered.length) {
+        _scrollToBottom();
         setState(() {
-          for (final m in next.skip(prev.length)) {
+          for (final m in nextFiltered.skip(prevFiltered.length)) {
             _newMessageIds.add(m.id);
           }
         });
-      } else {
-        setState(() => _newMessageIds.clear());
       }
+    });
+
+    // Clear animation set when the user switches threads.
+    ref.listen<String?>(selectedThreadIdProvider, (prev, next) {
+      if (prev != next) setState(() => _newMessageIds.clear());
     });
 
     if (selectedId == null) {
