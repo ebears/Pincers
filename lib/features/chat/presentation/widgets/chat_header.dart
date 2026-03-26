@@ -57,11 +57,6 @@ class _ChatHeaderState extends ConsumerState<ChatHeader> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.bgTertiary,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppConstants.radiusButton),
-          side: const BorderSide(color: AppColors.border),
-        ),
         title: Text(
           'Clear messages?',
           style: AppTypography.threadTitle.copyWith(color: AppColors.textPrimary),
@@ -165,11 +160,6 @@ class _ChatHeaderState extends ConsumerState<ChatHeader> {
             PopupMenuButton<_ChatMenuAction>(
               icon: const Icon(Icons.more_horiz,
                   size: 20, color: AppColors.textSecondary),
-              color: AppColors.bgTertiary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppConstants.radiusButton),
-                side: const BorderSide(color: AppColors.border),
-              ),
               onSelected: (action) {
                 switch (action) {
                   case _ChatMenuAction.rename:
@@ -186,9 +176,7 @@ class _ChatHeaderState extends ConsumerState<ChatHeader> {
                       const Icon(Icons.edit_outlined,
                           size: 16, color: AppColors.textSecondary),
                       const SizedBox(width: AppConstants.space8),
-                      Text('Rename',
-                          style: TextStyle(
-                              color: AppColors.textPrimary, fontSize: 14)),
+                      const Text('Rename'),
                     ],
                   ),
                 ),
@@ -200,8 +188,7 @@ class _ChatHeaderState extends ConsumerState<ChatHeader> {
                           size: 16, color: AppColors.error),
                       const SizedBox(width: AppConstants.space8),
                       Text('Clear messages',
-                          style:
-                              TextStyle(color: AppColors.error, fontSize: 14)),
+                          style: TextStyle(color: AppColors.error)),
                     ],
                   ),
                 ),

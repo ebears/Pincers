@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/constants/app_constants.dart';
 import '../../features/threads/presentation/providers/threads_provider.dart';
@@ -41,9 +40,9 @@ class EmptyState extends ConsumerWidget {
             const SizedBox(height: AppConstants.space32),
             ...prompts.map((p) => Padding(
               padding: const EdgeInsets.only(bottom: AppConstants.space8),
-              child: _PromptChip(
-                label: p,
-                onTap: () => _startWithPrompt(ref, p),
+              child: ActionChip(
+                label: Text(p),
+                onPressed: () => _startWithPrompt(ref, p),
               ),
             )),
           ],
@@ -60,40 +59,5 @@ class EmptyState extends ConsumerWidget {
   }
 }
 
-class _PromptChip extends StatefulWidget {
-  final String label;
-  final VoidCallback onTap;
-  const _PromptChip({required this.label, required this.onTap});
 
-  @override
-  State<_PromptChip> createState() => _PromptChipState();
-}
 
-class _PromptChipState extends State<_PromptChip> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppConstants.space16,
-            vertical: AppConstants.space8,
-          ),
-          decoration: BoxDecoration(
-            color: _hovered ? AppColors.bgHover : AppColors.bgTertiary,
-            borderRadius: BorderRadius.circular(AppConstants.radiusButton),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Text(widget.label, style: AppTypography.button),
-        ),
-      ),
-    );
-  }
-}

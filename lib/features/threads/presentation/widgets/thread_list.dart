@@ -44,7 +44,6 @@ class _ThreadListState extends ConsumerState<ThreadList> {
   void _confirmDelete(String id) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        backgroundColor: AppColors.bgTertiary,
         duration: const Duration(seconds: 5),
         content: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -143,7 +142,7 @@ class _ThreadListState extends ConsumerState<ThreadList> {
           padding: const EdgeInsets.all(AppConstants.space12),
           child: SizedBox(
             width: double.infinity,
-            child: ElevatedButton.icon(
+            child: FilledButton.icon(
               onPressed: _createThread,
               icon: const Icon(Icons.add, size: 18),
               label: const Text('New conversation'),

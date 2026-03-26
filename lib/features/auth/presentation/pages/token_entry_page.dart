@@ -127,7 +127,7 @@ class _TokenEntryPageState extends ConsumerState<TokenEntryPage> {
                       ),
                   ],
                   const SizedBox(height: AppConstants.space24),
-                  ElevatedButton(
+                  FilledButton(
                     onPressed: _isConnecting ? null : _connect,
                     child: _isConnecting
                         ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))

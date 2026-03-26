@@ -2,6 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 
+/// Named semantic text styles for Pincers UI components.
+///
+/// M3 type scale mapping (for reference):
+///   emptyStateTitle  → titleLarge
+///   threadTitle      → titleSmall / labelLarge
+///   chatMessage      → bodyMedium (15 sp)
+///   inputText        → bodyMedium
+///   button           → labelLarge
+///   timestamp        → labelSmall
+///   threadSubtitle   → bodySmall
+///   sectionLabel     → labelSmall (uppercase)
+///   settingsLabel    → bodyMedium (muted)
+///   settingsValue    → bodyMedium
+///   codeBlock        → (monospace, outside Inter scale)
 class AppTypography {
   AppTypography._();
 
@@ -36,9 +50,10 @@ class AppTypography {
         fontSize: 12,
         color: AppColors.textSecondary,
         fontWeight: FontWeight.w500,
-        letterSpacing: 0.05 * 12,
+        letterSpacing: 0.6,
       );
 
+  /// M3 titleLarge equivalent used for page/panel headings.
   static TextStyle get emptyStateTitle => GoogleFonts.inter(
         fontSize: 20,
         fontWeight: FontWeight.w600,
@@ -51,11 +66,13 @@ class AppTypography {
         color: AppColors.textSecondary,
       );
 
+  /// Monospace — outside the Inter scale, used only for code blocks.
   static TextStyle get codeBlock => GoogleFonts.jetBrainsMono(
         fontSize: 13,
         color: AppColors.textPrimary,
       );
 
+  /// M3 labelLarge — primary button and action labels.
   static TextStyle get button => GoogleFonts.inter(
         fontSize: 14,
         fontWeight: FontWeight.w500,

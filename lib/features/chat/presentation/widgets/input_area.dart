@@ -154,11 +154,29 @@ class _InputAreaState extends ConsumerState<InputArea> {
                         children: _pendingFiles
                             .asMap()
                             .entries
-                            .map((e) => _AttachmentPreviewChip(
-                                  file: e.value,
-                                  onRemove: () => setState(
-                                      () => _pendingFiles.removeAt(e.key)),
-                                ))
+                            .map((e) {
+                              final f = e.value;
+                              final isImage = f.mimeType.startsWith('image/');
+                              return InputChip(
+                                avatar: isImage
+                                    ? ClipOval(
+                                        child: Image.memory(
+                                          f.bytes,
+                                          width: 24,
+                                          height: 24,
+                                          fit: BoxFit.cover,
+                                        ),
+                                      )
+                                    : const Icon(Icons.insert_drive_file, size: 16),
+                                label: Text(
+                                  f.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                onDeleted: () => setState(
+                                    () => _pendingFiles.removeAt(e.key)),
+                              );
+                            })
                             .toList(),
                       ),
                     ),
@@ -215,8 +233,19 @@ class _InputAreaState extends ConsumerState<InputArea> {
                         padding: const EdgeInsets.only(
                             right: AppConstants.space8,
                             bottom: AppConstants.space8),
-                        child: _SendButton(
-                            onPressed: canSend ? _send : null),
+                        child: IconButton.filled(
+                          onPressed: canSend ? _send : null,
+                          icon: const Icon(Icons.send_rounded, size: 18),
+                          style: IconButton.styleFrom(
+                            backgroundColor: canSend ? AppColors.accent : AppColors.bgHover,
+                            foregroundColor: canSend ? Colors.white : AppColors.textMuted,
+                            minimumSize: const Size(36, 36),
+                            fixedSize: const Size(36, 36),
+                            padding: EdgeInsets.zero,
+                            shape: const CircleBorder(),
+                          ),
+                          tooltip: 'Send',
+                        ),
                       ),
                     ],
                   ),
@@ -230,99 +259,8 @@ class _InputAreaState extends ConsumerState<InputArea> {
   }
 }
 
-class _AttachmentPreviewChip extends StatelessWidget {
-  final _PendingFile file;
-  final VoidCallback onRemove;
 
-  const _AttachmentPreviewChip(
-      {required this.file, required this.onRemove});
 
-  @override
-  Widget build(BuildContext context) {
-    final isImage = file.mimeType.startsWith('image/');
 
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Container(
-          width: 60,
-          height: 60,
-          decoration: BoxDecoration(
-            color: AppColors.bgHover,
-            borderRadius: BorderRadius.circular(AppConstants.radiusButton),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: isImage
-              ? ClipRRect(
-                  borderRadius:
-                      BorderRadius.circular(AppConstants.radiusButton),
-                  child: Image.memory(file.bytes, fit: BoxFit.cover),
-                )
-              : Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.insert_drive_file,
-                        size: 20, color: AppColors.textSecondary),
-                    const SizedBox(height: 2),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Text(
-                        file.name,
-                        style: const TextStyle(
-                            fontSize: 9,
-                            color: AppColors.textSecondary),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ],
-                ),
-        ),
-        Positioned(
-          top: -6,
-          right: -6,
-          child: GestureDetector(
-            onTap: onRemove,
-            child: Container(
-              width: 18,
-              height: 18,
-              decoration: const BoxDecoration(
-                color: AppColors.textSecondary,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.close, size: 11, color: Colors.white),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
 
-class _SendButton extends StatelessWidget {
-  final VoidCallback? onPressed;
-  const _SendButton({this.onPressed});
 
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: onPressed != null ? AppColors.accent : AppColors.bgHover,
-      shape: const CircleBorder(),
-      child: InkWell(
-        onTap: onPressed,
-        customBorder: const CircleBorder(),
-        child: Container(
-          width: 36,
-          height: 36,
-          alignment: Alignment.center,
-          child: Icon(Icons.send_rounded,
-              size: 18,
-              color: onPressed != null
-                  ? Colors.white
-                  : AppColors.textMuted),
-        ),
-      ),
-    );
-  }
-}
