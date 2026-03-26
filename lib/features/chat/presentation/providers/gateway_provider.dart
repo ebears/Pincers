@@ -48,7 +48,10 @@ class GatewayNotifier extends StateNotifier<GatewayState> {
 
     state = const GatewayState(status: GatewayStatus.connecting);
     try {
-      await _ws.connect(auth.gatewayUrl!, auth.token!);
+      await _ws.connect(
+        auth.gatewayUrl!,
+        auth.token!,
+      );
       // Connected successfully; callback will keep state in sync from here on.
       state = const GatewayState(status: GatewayStatus.connected);
     } catch (e) {

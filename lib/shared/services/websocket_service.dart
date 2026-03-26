@@ -13,8 +13,6 @@ class WebSocketService {
 
   ConnectionStatus _status = ConnectionStatus.disconnected;
   String? _gatewayUrl;
-  String? _token;
-  bool _trustSelfSigned = false;
   bool _intentionalDisconnect = false;
   int _reconnectAttempt = 0;
   Timer? _reconnectTimer;
@@ -29,14 +27,12 @@ class WebSocketService {
     onStatusChange?.call(s);
   }
 
-  Future<void> connect(String gatewayUrl, String token, {bool trustSelfSigned = false}) async {
+  Future<void> connect(String gatewayUrl, String token) async {
     _intentionalDisconnect = false;
     _reconnectAttempt = 0;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
     _gatewayUrl = gatewayUrl;
-    _token = token;
-    _trustSelfSigned = trustSelfSigned;
     await _doConnect();
   }
 
@@ -44,7 +40,7 @@ class WebSocketService {
     _setStatus(ConnectionStatus.connecting);
     try {
       final uri = Uri.parse(_gatewayUrl!);
-      _channel = await createChannel(uri, _token!, _trustSelfSigned);
+      _channel = await createChannel(uri);
       _reconnectAttempt = 0;
       _setStatus(ConnectionStatus.connected);
       _channel!.stream.listen(

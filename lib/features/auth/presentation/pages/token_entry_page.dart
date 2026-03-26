@@ -14,11 +14,12 @@ class TokenEntryPage extends ConsumerStatefulWidget {
 }
 
 class _TokenEntryPageState extends ConsumerState<TokenEntryPage> {
-  final _urlController = TextEditingController(text: 'ws://');
+  final _urlController = TextEditingController(text: 'wss://');
   final _tokenController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _isConnecting = false;
   String? _error;
+  String? _errorDetail;
 
   @override
   void dispose() {
@@ -29,17 +30,38 @@ class _TokenEntryPageState extends ConsumerState<TokenEntryPage> {
 
   Future<void> _connect() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() { _isConnecting = true; _error = null; });
+    setState(() { _isConnecting = true; _error = null; _errorDetail = null; });
     try {
-      await ref.read(authProvider.notifier).saveCredentials(
+      await ref.read(authProvider.notifier).validateAndSaveCredentials(
         _urlController.text.trim(),
         _tokenController.text.trim(),
       );
       if (mounted) context.go('/');
+    } on AuthException catch (e) {
+      setState(() {
+        _error = _messageForFailure(e.reason);
+        _errorDetail = e.detail;
+      });
     } catch (e) {
-      setState(() { _error = 'Failed to connect: $e'; });
+      setState(() {
+        _error = 'Something went wrong. Please try again.';
+        _errorDetail = e.toString();
+      });
     } finally {
       if (mounted) setState(() { _isConnecting = false; });
+    }
+  }
+
+  String _messageForFailure(AuthFailureReason reason) {
+    switch (reason) {
+      case AuthFailureReason.timeout:
+        return 'Gateway didn\'t respond. Check the URL and try again.';
+      case AuthFailureReason.networkError:
+        return 'Couldn\'t reach the gateway. Check your connection and URL.';
+      case AuthFailureReason.authRejected:
+        return 'Token rejected. Double-check your bearer token.';
+      case AuthFailureReason.generic:
+        return 'Connection failed.';
     }
   }
 
@@ -95,6 +117,14 @@ class _TokenEntryPageState extends ConsumerState<TokenEntryPage> {
                   if (_error != null) ...[
                     const SizedBox(height: AppConstants.space12),
                     Text(_error!, style: TextStyle(color: AppColors.error, fontSize: 13)),
+                    if (_errorDetail != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          _errorDetail!,
+                          style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+                        ),
+                      ),
                   ],
                   const SizedBox(height: AppConstants.space24),
                   ElevatedButton(

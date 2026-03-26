@@ -7,9 +7,8 @@ import '../../../../shared/services/websocket_channel_factory.dart';
 
 const _tokenKey = 'gateway_token';
 const _urlKey = 'gateway_url';
-const _trustKey = 'trust_self_signed';
 
-enum AuthFailureReason { timeout, networkError, authRejected, sslError, generic }
+enum AuthFailureReason { timeout, networkError, authRejected, generic }
 
 class AuthException implements Exception {
   final AuthFailureReason reason;
@@ -28,13 +27,11 @@ class AuthState {
   final String? token;
   final String? gatewayUrl;
   final bool isLoading;
-  final bool trustSelfSigned;
 
   const AuthState({
     this.token,
     this.gatewayUrl,
     this.isLoading = false,
-    this.trustSelfSigned = false,
   });
 
   bool get isAuthenticated => token != null && gatewayUrl != null;
@@ -43,13 +40,11 @@ class AuthState {
     String? token,
     String? gatewayUrl,
     bool? isLoading,
-    bool? trustSelfSigned,
   }) {
     return AuthState(
       token: token ?? this.token,
       gatewayUrl: gatewayUrl ?? this.gatewayUrl,
       isLoading: isLoading ?? this.isLoading,
-      trustSelfSigned: trustSelfSigned ?? this.trustSelfSigned,
     );
   }
 }
@@ -64,25 +59,20 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> _loadCredentials() async {
     final token = await _storage.read(key: _tokenKey);
     final url = await _storage.read(key: _urlKey);
-    final trust = await _storage.read(key: _trustKey);
     state = AuthState(
       token: token,
       gatewayUrl: url,
-      trustSelfSigned: trust == 'true',
       isLoading: false,
     );
   }
 
   /// Validates credentials against the gateway then saves them.
-  /// Always runs a real connection probe; [trustSelfSigned] controls whether
-  /// TLS certificate errors are bypassed during that probe.
   Future<void> validateAndSaveCredentials(
     String gatewayUrl,
-    String token, {
-    bool trustSelfSigned = false,
-  }) async {
-    await _validateConnection(gatewayUrl, token, trustSelfSigned);
-    await saveCredentials(gatewayUrl, token, trustSelfSigned: trustSelfSigned);
+    String token,
+  ) async {
+    await _validateConnection(gatewayUrl, token);
+    await saveCredentials(gatewayUrl, token);
   }
 
   /// Opens a WebSocket, performs the OpenClaw connect handshake, and checks
@@ -90,11 +80,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> _validateConnection(
     String gatewayUrl,
     String token,
-    bool trustSelfSigned,
   ) async {
     final uri = Uri.parse(gatewayUrl);
     try {
-      final channel = await createChannel(uri, token, trustSelfSigned)
+      final channel = await createChannel(uri)
           .timeout(
         const Duration(seconds: 10),
         onTimeout: () => throw const AuthException(AuthFailureReason.timeout),
@@ -125,7 +114,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           msg.contains('verify') ||
           msg.contains('-2146') || // Windows SChannel cert error codes
           msg.contains('sec_e')) {
-        throw AuthException(AuthFailureReason.sslError, detail: raw);
+        throw AuthException(AuthFailureReason.networkError, detail: raw);
       }
       if (msg.contains('failed host lookup') ||
           msg.contains('no address associated') ||
@@ -227,23 +216,19 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> saveCredentials(
     String gatewayUrl,
-    String token, {
-    bool trustSelfSigned = false,
-  }) async {
+    String token,
+  ) async {
     await _storage.write(key: _tokenKey, value: token);
     await _storage.write(key: _urlKey, value: gatewayUrl);
-    await _storage.write(key: _trustKey, value: trustSelfSigned.toString());
     state = AuthState(
       token: token,
       gatewayUrl: gatewayUrl,
-      trustSelfSigned: trustSelfSigned,
     );
   }
 
   Future<void> clearCredentials() async {
     await _storage.delete(key: _tokenKey);
     await _storage.delete(key: _urlKey);
-    await _storage.delete(key: _trustKey);
     state = const AuthState();
   }
 }
