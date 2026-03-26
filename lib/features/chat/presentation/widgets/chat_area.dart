@@ -28,6 +28,10 @@ class _ChatAreaState extends ConsumerState<ChatArea> {
   bool _isDragOver = false;
   final Set<String> _newMessageIds = {};
 
+  // Store last failed send for retry.
+  String? _lastFailedContent;
+  List<AttachmentModel> _lastFailedAttachments = const [];
+
   @override
   void dispose() {
     _scrollController.dispose();
@@ -51,15 +55,31 @@ class _ChatAreaState extends ConsumerState<ChatArea> {
     final threadId = ref.read(selectedThreadIdProvider);
     if (threadId == null) return;
 
-    setState(() => _hasError = false);
+    setState(() {
+      _hasError = false;
+    });
     try {
       await ref
           .read(chatProvider.notifier)
           .sendMessage(threadId, content, attachments: attachments);
+      _lastFailedContent = null;
+      _lastFailedAttachments = const [];
       _scrollToBottom();
     } catch (e) {
-      setState(() => _hasError = true);
+      _lastFailedContent = content;
+      _lastFailedAttachments = attachments;
+      setState(() {
+        _hasError = true;
+      });
     }
+  }
+
+  Future<void> _retry() async {
+    if (_lastFailedContent == null) return;
+    // Remove the optimistically-added user message before resending.
+    final threadId = ref.read(selectedThreadIdProvider);
+    if (threadId == null) return;
+    await _sendMessage(_lastFailedContent!, _lastFailedAttachments);
   }
 
   @override
@@ -90,9 +110,10 @@ class _ChatAreaState extends ConsumerState<ChatArea> {
       );
     }
 
-    final isConnected = gatewayStatus == GatewayStatus.connected;
+    final isConnecting = gatewayStatus == GatewayStatus.connecting;
     final isReconnecting = gatewayStatus == GatewayStatus.reconnecting;
-    final extraItems = isTyping ? 1 : (isReconnecting ? 1 : 0);
+    final showStatusIndicator = isTyping || isReconnecting || isConnecting;
+    final extraItems = showStatusIndicator ? 1 : 0;
 
     return DropTarget(
       onDragEntered: (_) => setState(() => _isDragOver = true),
@@ -120,8 +141,10 @@ class _ChatAreaState extends ConsumerState<ChatArea> {
                 itemBuilder: (context, index) {
                   if (index == messages.length) {
                     if (isTyping) return _centeredWidget(const TypingIndicator());
-                    if (isReconnecting) {
-                      return _centeredWidget(const _ReconnectingIndicator());
+                    if (isReconnecting || isConnecting) {
+                      return _centeredWidget(_ReconnectingIndicator(
+                        message: isConnecting ? 'Connecting...' : 'Reconnecting...',
+                      ));
                     }
                   }
                   final msg = messages[index];
@@ -137,36 +160,39 @@ class _ChatAreaState extends ConsumerState<ChatArea> {
               ),
             ),
             if (_hasError)
-              Container(
-                color: AppColors.error.withValues(alpha: 0.15),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppConstants.space16,
-                  vertical: AppConstants.space8,
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.error_outline,
-                        color: AppColors.error, size: 16),
-                    const SizedBox(width: AppConstants.space8),
-                    Expanded(
-                      child: Text(
-                        "Couldn't send. Tap to retry.",
-                        style: TextStyle(color: AppColors.error, fontSize: 13),
+              GestureDetector(
+                onTap: _retry,
+                child: Container(
+                  color: AppColors.error.withValues(alpha: 0.15),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppConstants.space16,
+                    vertical: AppConstants.space8,
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.error_outline,
+                          color: AppColors.error, size: 16),
+                      const SizedBox(width: AppConstants.space8),
+                      Expanded(
+                        child: Text(
+                          "Couldn't send. Click to retry.",
+                          style: TextStyle(color: AppColors.error, fontSize: 13),
+                        ),
                       ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close,
-                          size: 16, color: AppColors.error),
-                      onPressed: () => setState(() => _hasError = false),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                  ],
+                      IconButton(
+                        icon: const Icon(Icons.close,
+                            size: 16, color: AppColors.error),
+                        onPressed: () => setState(() => _hasError = false),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             InputArea(
               onSend: _sendMessage,
-              enabled: isConnected,
+              enabled: true,
             ),
           ],
         ),
@@ -237,7 +263,8 @@ class _AnimatedMessageEntryState extends State<_AnimatedMessageEntry>
 // ── Task 3: reconnecting indicator ───────────────────────────────────────────
 
 class _ReconnectingIndicator extends StatelessWidget {
-  const _ReconnectingIndicator();
+  final String message;
+  const _ReconnectingIndicator({this.message = 'Reconnecting...'});
 
   @override
   Widget build(BuildContext context) {
@@ -269,7 +296,7 @@ class _ReconnectingIndicator extends StatelessWidget {
                 ),
                 const SizedBox(width: AppConstants.space8),
                 Text(
-                  'Reconnecting...',
+                  message,
                   style: TextStyle(
                       color: AppColors.textSecondary, fontSize: 13),
                 ),

@@ -9,6 +9,7 @@ import '../../../settings/presentation/providers/settings_provider.dart';
 import '../../../settings/presentation/widgets/settings_panel.dart';
 import '../../../../shared/widgets/app_header.dart';
 import '../providers/chat_provider.dart';
+import '../providers/gateway_provider.dart';
 import '../widgets/chat_area.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
@@ -21,11 +22,21 @@ class ChatPage extends ConsumerStatefulWidget {
 class _ChatPageState extends ConsumerState<ChatPage> {
   bool _sidebarVisible = true;
   final FocusNode _keyboardFocus = FocusNode();
+  bool _connectAttempted = false;
 
   @override
   void dispose() {
     _keyboardFocus.dispose();
     super.dispose();
+  }
+
+  void _ensureGatewayConnected() {
+    if (_connectAttempted) return;
+    _connectAttempted = true;
+    final status = ref.read(gatewayProvider).status;
+    if (status == GatewayStatus.disconnected || status == GatewayStatus.error) {
+      ref.read(gatewayProvider.notifier).connect();
+    }
   }
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
@@ -72,6 +83,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   @override
   Widget build(BuildContext context) {
+    _ensureGatewayConnected();
+
     final width = MediaQuery.of(context).size.width;
     final isDesktop = width >= AppConstants.breakpointDesktop;
     final isTablet = width >= AppConstants.breakpointTablet;

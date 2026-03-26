@@ -29,6 +29,8 @@ dependencies:
   flutter_secure_storage: ^9.2.2
   cross_file: ^0.3.4+2
   desktop_drop: ^0.4.4
+  cryptography: ^2.9.0
+  crypto: ^3.0.7
 
 dev_dependencies:
   flutter_test:

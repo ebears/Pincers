@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../data/models/message_model.dart';
@@ -15,84 +16,97 @@ class ChatNotifier extends StateNotifier<List<MessageModel>> {
   final ChatRepository _repo;
   final Ref _ref;
 
-  // Tracks in-progress streaming bot messages: threadId → messageId
+  /// Tracks in-progress streaming bot messages: runId → messageId
   final Map<String, String> _streamingIds = {};
-  // Accumulates streaming content per thread: threadId → content so far
+  /// Accumulates streaming content per run: runId → content so far
   final Map<String, StringBuffer> _streamingBuffers = {};
+  /// Maps runId → threadId so we know which thread a streaming run belongs to
+  final Map<String, String> _runThreadMap = {};
 
-  StreamSubscription<Map<String, dynamic>>? _messageSub;
+  StreamSubscription<Map<String, dynamic>>? _eventSub;
 
   ChatNotifier(this._repo, this._ref) : super([]) {
-    _messageSub = _ref
+    _eventSub = _ref
         .read(gatewayProvider.notifier)
-        .messages
-        .listen(_handleGatewayMessage);
+        .events
+        .listen(_handleGatewayEvent);
   }
 
   @override
   void dispose() {
-    _messageSub?.cancel();
+    _eventSub?.cancel();
     super.dispose();
   }
 
-  // ── Incoming message routing ────────────────────────────────────────────────
+  // ── Incoming event routing ────────────────────────────────────────────────
 
-  void _handleGatewayMessage(Map<String, dynamic> msg) {
+  void _handleGatewayEvent(Map<String, dynamic> msg) {
     if (!mounted) return;
 
-    if (msg.containsKey('method')) {
-      // JSON-RPC notification
-      final method = msg['method'] as String;
-      final params = (msg['params'] as Map<String, dynamic>?) ?? {};
-      switch (method) {
-        case 'session.token':
-          _handleStreamToken(params);
-        case 'session.message':
-          // Non-streaming complete message via notification
-          final threadId = params['thread_id'] as String?;
-          final content = params['content'] as String?;
-          if (threadId != null && content != null) {
-            receiveBotMessage(threadId, content);
-          }
-      }
-    } else if (msg.containsKey('id') && msg.containsKey('result')) {
-      // JSON-RPC success response — treat as complete bot message
-      final result = (msg['result'] as Map<String, dynamic>?) ?? {};
-      final content = result['content'] as String?;
-      final threadId =
-          result['thread_id'] as String? ?? _ref.read(selectedThreadIdProvider);
-      if (content != null && threadId != null) {
-        receiveBotMessage(threadId, content);
-      }
+    final event = msg['event'] as String?;
+    debugPrint('[Pincers] Gateway event: $event');
+    if (event == 'chat.event') {
+      final payload = (msg['payload'] as Map<String, dynamic>?) ?? {};
+      _handleChatEvent(payload);
     }
   }
 
-  void _handleStreamToken(Map<String, dynamic> params) {
-    final threadId = params['thread_id'] as String?;
-    final token = params['content'] as String? ?? '';
-    final done = params['done'] as bool? ?? false;
+  void _handleChatEvent(Map<String, dynamic> payload) {
+    final eventState = payload['state'] as String?;
+    final runId = payload['runId'] as String?;
+    final sessionKey = payload['sessionKey'] as String?;
+    final message = payload['message'] as Map<String, dynamic>?;
 
+    if (runId == null) return;
+
+    // Resolve threadId from sessionKey.
+    final threadId = _resolveThreadId(sessionKey);
     if (threadId == null) return;
 
-    // Dismiss typing indicator on first token
-    if (!_streamingIds.containsKey(threadId)) {
+    // Track which thread this run belongs to.
+    _runThreadMap[runId] = threadId;
+
+    switch (eventState) {
+      case 'delta':
+        _handleDelta(runId, threadId, message);
+      case 'final':
+        _handleFinal(runId, threadId, message);
+      case 'error':
+      case 'aborted':
+        _handleErrorOrAbort(runId, payload);
+    }
+  }
+
+  String? _resolveThreadId(String? sessionKey) {
+    if (sessionKey == null) return _ref.read(selectedThreadIdProvider);
+    final threads = _ref.read(threadsProvider);
+    final match = threads.where((t) => t.sessionId == sessionKey).firstOrNull;
+    return match?.id ?? _ref.read(selectedThreadIdProvider);
+  }
+
+  void _handleDelta(
+      String runId, String threadId, Map<String, dynamic>? message) {
+    final content = _extractContent(message);
+
+    if (!_streamingIds.containsKey(runId)) {
+      // First delta: dismiss typing indicator, create placeholder message.
       _ref.read(typingProvider.notifier).state = false;
       final id = _uuid.v4();
-      _streamingIds[threadId] = id;
-      _streamingBuffers[threadId] = StringBuffer(token);
+      _streamingIds[runId] = id;
+      _streamingBuffers[runId] = StringBuffer(content);
       final partialMsg = MessageModel(
         id: id,
         threadId: threadId,
         role: 'bot',
-        content: token,
+        content: content,
         attachments: const [],
         createdAt: DateTime.now(),
       );
       state = [...state, partialMsg];
     } else {
-      _streamingBuffers[threadId]!.write(token);
-      final id = _streamingIds[threadId]!;
-      final newContent = _streamingBuffers[threadId]!.toString();
+      _streamingBuffers[runId]!.write(content);
+      final id = _streamingIds[runId]!;
+      final newContent = _streamingBuffers[runId]!.toString();
       state = [
         for (final m in state)
           if (m.id == id)
@@ -108,15 +122,85 @@ class ChatNotifier extends StateNotifier<List<MessageModel>> {
             m,
       ];
     }
+  }
 
-    if (done) {
-      final id = _streamingIds[threadId]!;
+  void _handleFinal(
+      String runId, String threadId, Map<String, dynamic>? message) {
+    _ref.read(typingProvider.notifier).state = false;
+
+    if (_streamingIds.containsKey(runId)) {
+      // Finalize the streaming message.
+      final id = _streamingIds[runId]!;
+      final content = _extractContent(message);
+      if (content.isNotEmpty) {
+        // Use the final content from the server if provided.
+        state = [
+          for (final m in state)
+            if (m.id == id)
+              MessageModel(
+                id: m.id,
+                threadId: m.threadId,
+                role: m.role,
+                content: content,
+                attachments: m.attachments,
+                createdAt: m.createdAt,
+              )
+            else
+              m,
+        ];
+      }
       final finalMsg = state.firstWhere((m) => m.id == id);
       _repo.saveMessage(finalMsg);
-      _streamingIds.remove(threadId);
-      _streamingBuffers.remove(threadId);
+      _cleanupRun(runId);
       _ref.read(threadsProvider.notifier).touchThread(threadId);
+    } else {
+      // No deltas preceded this — treat as a complete non-streaming response.
+      final content = _extractContent(message);
+      if (content.isNotEmpty) {
+        _receiveBotMessage(threadId, content);
+      }
     }
+  }
+
+  void _handleErrorOrAbort(String runId, Map<String, dynamic> payload) {
+    _ref.read(typingProvider.notifier).state = false;
+
+    if (_streamingIds.containsKey(runId)) {
+      // Persist whatever we accumulated.
+      final id = _streamingIds[runId]!;
+      final msg = state.where((m) => m.id == id).firstOrNull;
+      if (msg != null && msg.content.isNotEmpty) {
+        _repo.saveMessage(msg);
+      }
+      _cleanupRun(runId);
+    }
+  }
+
+  void _cleanupRun(String runId) {
+    _streamingIds.remove(runId);
+    _streamingBuffers.remove(runId);
+    _runThreadMap.remove(runId);
+  }
+
+  /// Extract text content from a message payload.
+  String _extractContent(Map<String, dynamic>? message) {
+    if (message == null) return '';
+    // The message may have a 'content' field that's a string or a list of blocks.
+    final content = message['content'];
+    if (content is String) return content;
+    if (content is List) {
+      final buffer = StringBuffer();
+      for (final block in content) {
+        if (block is Map && block['type'] == 'text') {
+          buffer.write(block['text'] ?? '');
+        }
+      }
+      return buffer.toString();
+    }
+    // Fallback: check for 'text' directly.
+    final text = message['text'];
+    if (text is String) return text;
+    return '';
   }
 
   // ── Public API ──────────────────────────────────────────────────────────────
@@ -125,8 +209,62 @@ class ChatNotifier extends StateNotifier<List<MessageModel>> {
     state = _repo.getMessagesForThread(threadId);
   }
 
+  /// Ensure the thread has a gateway session; create one lazily if not.
+  Future<String> _ensureSession(String threadId) async {
+    final threads = _ref.read(threadsProvider);
+    final thread = threads.firstWhere((t) => t.id == threadId,
+        orElse: () => throw StateError('Thread not found'));
+
+    if (thread.sessionId != null) return thread.sessionId!;
+
+    // Use thread ID as unique session label to avoid collisions.
+    final label = 'pincers-$threadId';
+
+    try {
+      final result = await _ref.read(gatewayProvider.notifier).sendRequest(
+        'sessions.create',
+        {'label': label},
+      );
+      final sessionKey = result['key'] as String? ??
+          result['sessionKey'] as String? ??
+          '';
+      if (sessionKey.isEmpty) {
+        throw StateError('Gateway returned no session key');
+      }
+
+      await _ref
+          .read(threadsProvider.notifier)
+          .updateSessionId(threadId, sessionKey);
+      return sessionKey;
+    } catch (e) {
+      // If the label is already in use, try to find the existing session.
+      if (e.toString().contains('label already in use')) {
+        debugPrint('[Pincers] Session label collision, listing sessions...');
+        final listResult = await _ref
+            .read(gatewayProvider.notifier)
+            .sendRequest('sessions.list', {});
+        final sessions = (listResult['sessions'] as List<dynamic>?) ?? [];
+        for (final s in sessions) {
+          if (s is Map<String, dynamic> && s['label'] == label) {
+            final sessionKey = s['key'] as String? ??
+                s['sessionKey'] as String? ??
+                '';
+            if (sessionKey.isNotEmpty) {
+              await _ref
+                  .read(threadsProvider.notifier)
+                  .updateSessionId(threadId, sessionKey);
+              return sessionKey;
+            }
+          }
+        }
+      }
+      rethrow;
+    }
+  }
+
   Future<void> sendMessage(String threadId, String content,
       {List<AttachmentModel> attachments = const []}) async {
+    // Optimistically add user message.
     final msg = MessageModel(
       id: _uuid.v4(),
       threadId: threadId,
@@ -138,7 +276,7 @@ class ChatNotifier extends StateNotifier<List<MessageModel>> {
     await _repo.saveMessage(msg);
     state = [...state, msg];
 
-    // Update thread title from first message
+    // Update thread title from first message.
     final threads = _ref.read(threadsProvider);
     final thread = threads.firstWhere((t) => t.id == threadId,
         orElse: () => throw StateError('Thread not found'));
@@ -147,38 +285,68 @@ class ChatNotifier extends StateNotifier<List<MessageModel>> {
           ? content.substring(0, AppConstants.threadTitleMaxLength)
           : content;
       await _ref.read(threadsProvider.notifier).updateTitle(threadId, title);
-      // Also set the preview from the first message
       final preview = content.length > 60 ? content.substring(0, 60) : content;
       await _ref.read(threadsProvider.notifier).updatePreview(threadId, preview);
     }
     await _ref.read(threadsProvider.notifier).touchThread(threadId);
 
-    // Show typing indicator and send to gateway
+    // Show typing indicator.
     _ref.read(typingProvider.notifier).state = true;
+
     try {
-      await _ref.read(gatewayProvider.notifier).send(
-        'session.send',
+      // Wait for gateway connection if still connecting.
+      debugPrint('[Pincers] Waiting for gateway connection...');
+      await _ref.read(gatewayProvider.notifier).waitForConnection();
+      debugPrint('[Pincers] Gateway connected, ensuring session...');
+
+      final sessionKey = await _ensureSession(threadId);
+      debugPrint('[Pincers] Session key: $sessionKey, sending chat.send...');
+
+      // Format attachments per OpenClaw spec.
+      final formattedAttachments = attachments.map(_formatAttachment).toList();
+
+      await _ref.read(gatewayProvider.notifier).sendRequest(
+        'chat.send',
         {
-          'thread_id': threadId,
-          'content': content,
-          if (attachments.isNotEmpty)
-            'attachments': attachments
-                .map((a) => {
-                      'id': a.id,
-                      'filename': a.filename,
-                      'mime_type': a.mimeType,
-                      'data': a.base64Data,
-                    })
-                .toList(),
+          'sessionKey': sessionKey,
+          'message': content,
+          if (formattedAttachments.isNotEmpty)
+            'attachments': formattedAttachments,
+          'deliver': true,
+          'idempotencyKey': msg.id,
         },
-        id: msg.id,
       );
-    } catch (_) {
-      // Error handling is done at the UI layer
+      debugPrint('[Pincers] chat.send request acknowledged by gateway');
+    } catch (e) {
+      debugPrint('[Pincers] Send failed: $e');
+      // On send failure, hide typing. Error is surfaced to UI via the throw.
+      _ref.read(typingProvider.notifier).state = false;
+      rethrow;
     }
   }
 
-  Future<void> receiveBotMessage(String threadId, String content) async {
+  Map<String, dynamic> _formatAttachment(AttachmentModel a) {
+    if (a.mimeType.startsWith('image/')) {
+      return {
+        'type': 'image',
+        'source': {
+          'type': 'base64',
+          'media_type': a.mimeType,
+          'data': a.base64Data,
+        },
+      };
+    }
+    return {
+      'type': 'document',
+      'source': {
+        'type': 'base64',
+        'media_type': a.mimeType,
+        'data': a.base64Data,
+      },
+    };
+  }
+
+  Future<void> _receiveBotMessage(String threadId, String content) async {
     _ref.read(typingProvider.notifier).state = false;
     final msg = MessageModel(
       id: _uuid.v4(),

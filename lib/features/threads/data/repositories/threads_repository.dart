@@ -38,6 +38,15 @@ class ThreadsRepository {
     }
   }
 
+  Future<void> updateSessionId(String id, String sessionId) async {
+    final thread = _box.get(id);
+    if (thread != null) {
+      thread.sessionId = sessionId;
+      thread.updatedAt = DateTime.now();
+      await thread.save();
+    }
+  }
+
   Future<void> touchThread(String id) async {
     final thread = _box.get(id);
     if (thread != null) {

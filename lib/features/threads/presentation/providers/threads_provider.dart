@@ -52,6 +52,11 @@ class ThreadsNotifier extends StateNotifier<List<ThreadModel>> {
     loadThreads();
   }
 
+  Future<void> updateSessionId(String id, String sessionId) async {
+    await _repo.updateSessionId(id, sessionId);
+    loadThreads();
+  }
+
   Future<void> touchThread(String id) async {
     await _repo.touchThread(id);
     loadThreads();

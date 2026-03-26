@@ -158,10 +158,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
               'minProtocol': 3,
               'maxProtocol': 3,
               'client': {
-                'id': 'gateway-client',
+                'id': 'cli',
+                'displayName': 'Pincers',
                 'version': '1.0.0',
                 'platform': 'flutter',
-                'mode': 'ui',
+                'mode': 'backend',
               },
               'role': 'operator',
               'scopes': ['operator.read', 'operator.write'],
