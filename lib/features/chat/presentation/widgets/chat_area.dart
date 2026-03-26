@@ -14,6 +14,7 @@ import 'chat_bubble.dart';
 import 'chat_header.dart';
 import 'typing_indicator.dart';
 import 'input_area.dart';
+import 'verbose_bubble.dart';
 
 class ChatArea extends ConsumerStatefulWidget {
   const ChatArea({super.key});
@@ -88,6 +89,12 @@ class _ChatAreaState extends ConsumerState<ChatArea> {
     final messages = ref.watch(chatProvider);
     final isTyping = ref.watch(typingProvider);
     final gatewayStatus = ref.watch(gatewayProvider).status;
+    final verboseMode = ref.watch(verboseModeProvider);
+
+    // Only show verbose entries when the toggle is on.
+    final displayMessages = verboseMode
+        ? messages
+        : messages.where((m) => !m.isVerbose).toList();
 
     ref.listen<List<MessageModel>>(chatProvider, (prev, next) {
       _scrollToBottom();
@@ -137,9 +144,9 @@ class _ChatAreaState extends ConsumerState<ChatArea> {
               child: ListView.builder(
                 controller: _scrollController,
                 padding: const EdgeInsets.symmetric(vertical: AppConstants.space24),
-                itemCount: messages.length + extraItems,
+                itemCount: displayMessages.length + extraItems,
                 itemBuilder: (context, index) {
-                  if (index == messages.length) {
+                  if (index == displayMessages.length) {
                     if (isTyping) return _centeredWidget(const TypingIndicator());
                     if (isReconnecting || isConnecting) {
                       return _centeredWidget(_ReconnectingIndicator(
@@ -147,14 +154,15 @@ class _ChatAreaState extends ConsumerState<ChatArea> {
                       ));
                     }
                   }
-                  final msg = messages[index];
+                  final msg = displayMessages[index];
                   final prev =
-                      index > 0 ? messages[index - 1].createdAt : null;
-                  final bubble =
-                      ChatBubble(message: msg, previousMessageTime: prev);
+                      index > 0 ? displayMessages[index - 1].createdAt : null;
+                  final Widget bubbleWidget = msg.isVerbose
+                      ? VerboseBubble(message: msg)
+                      : ChatBubble(message: msg, previousMessageTime: prev);
                   final isNew = _newMessageIds.contains(msg.id);
                   return _centeredWidget(
-                    isNew ? _AnimatedMessageEntry(child: bubble) : bubble,
+                    isNew ? _AnimatedMessageEntry(child: bubbleWidget) : bubbleWidget,
                   );
                 },
               ),

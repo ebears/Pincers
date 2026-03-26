@@ -34,4 +34,5 @@ class MessageModel extends HiveObject {
 
   bool get isUser => role == 'user';
   bool get isBot => role == 'bot';
+  bool get isVerbose => role == 'verbose';
 }

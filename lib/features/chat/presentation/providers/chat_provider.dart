@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
@@ -228,16 +229,34 @@ class ChatNotifier extends StateNotifier<List<MessageModel>> {
   /// that never arrive via `chat` events alone (the `chat.send` run ends with
   /// a silent final while the actual answer lands in a separate run).
   ///
-  /// We display only final assistant messages with visible text, skipping tool
-  /// calls (stopReason: toolUse), thinking blocks, user echoes, and anything
-  /// already shown via streaming `chat` events.
+  /// When verbose mode is on, messages with `stopReason: toolUse` are also
+  /// processed: each `toolCall` content block is rendered as a transient
+  /// verbose activity entry (not persisted to Hive).
+  ///
+  /// We display only final assistant messages with visible text, skipping
+  /// thinking blocks, user echoes, and anything already shown via streaming
+  /// `chat` events.
   void _handleSessionMessage(Map<String, dynamic> payload) {
     final message = payload['message'] as Map<String, dynamic>?;
     if (message == null) return;
 
-    // Only process final assistant messages (skip user echoes and tool calls).
     if ((message['role'] as String?) != 'assistant') return;
-    if ((message['stopReason'] as String?) != 'stop') return;
+
+    final stopReason = message['stopReason'] as String?;
+    final sessionKey = payload['sessionKey'] as String?;
+    final threadId = _resolveThreadId(sessionKey);
+    if (threadId == null) return;
+
+    // In verbose mode, capture tool-call activity from tool-use stops.
+    if (stopReason == 'toolUse' && _ref.read(verboseModeProvider)) {
+      for (final call in _extractToolCalls(message)) {
+        _addVerboseMessage(threadId, call.$1, call.$2);
+      }
+      return;
+    }
+
+    // Only display final assistant messages with visible text.
+    if (stopReason != 'stop') return;
 
     // Extract visible text — thinking/toolCall blocks yield an empty string.
     final content = _stripTrailingTag(_extractContent(message));
@@ -246,11 +265,47 @@ class ChatNotifier extends StateNotifier<List<MessageModel>> {
     // Skip if this content was just finalized via streaming chat events.
     if (_wasRecentlyStreamed(content)) return;
 
-    final sessionKey = payload['sessionKey'] as String?;
-    final threadId = _resolveThreadId(sessionKey);
-    if (threadId == null) return;
+    // Skip if the streaming path is currently building this thread's response.
+    // The chat-event pipeline (delta → final) will finalize it; delivering here
+    // too would create a duplicate.
+    if (_runThreadMap.values.any((t) => t == threadId)) return;
 
     _receiveBotMessage(threadId, content);
+  }
+
+  /// Extracts `toolCall` content blocks from a message, returning
+  /// `(toolName, argsJson)` pairs for each call found.
+  List<(String, String)> _extractToolCalls(Map<String, dynamic> message) {
+    final content = message['content'];
+    if (content is! List) return const [];
+    final results = <(String, String)>[];
+    for (final block in content) {
+      if (block is Map && block['type'] == 'toolCall') {
+        final name = (block['name'] as String?) ?? 'unknown_tool';
+        final args = block['arguments'];
+        final argsJson = args == null
+            ? '{}'
+            : (args is String ? args : jsonEncode(args));
+        results.add((name, argsJson));
+      }
+    }
+    return results;
+  }
+
+  /// Appends a transient verbose message to state without persisting to Hive.
+  ///
+  /// Content is encoded as `"$toolName\n$argsJson"` so [VerboseBubble] can
+  /// split on the first newline to recover the two parts.
+  void _addVerboseMessage(String threadId, String toolName, String argsJson) {
+    final msg = MessageModel(
+      id: _uuid.v4(),
+      threadId: threadId,
+      role: 'verbose',
+      content: '$toolName\n$argsJson',
+      attachments: const [],
+      createdAt: DateTime.now(),
+    );
+    state = [...state, msg];
   }
 
   void _markContentAsStreamed(String content) {
@@ -504,3 +559,7 @@ final chatProvider =
     StateNotifierProvider<ChatNotifier, List<MessageModel>>((ref) {
   return ChatNotifier(ref.watch(chatRepositoryProvider), ref);
 });
+
+/// Controls whether verbose tool-call activity is shown in the chat.
+/// Transient — not persisted across app restarts.
+final verboseModeProvider = StateProvider<bool>((ref) => false);

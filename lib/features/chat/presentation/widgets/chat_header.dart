@@ -155,7 +155,9 @@ class _ChatHeaderState extends ConsumerState<ChatHeader> {
               constraints: const BoxConstraints(),
               tooltip: 'Cancel',
             ),
-          ] else
+          ] else ...[
+            _VerboseToggleButton(),
+            const SizedBox(width: AppConstants.space4),
             PopupMenuButton<_ChatMenuAction>(
               icon: const Icon(Icons.more_horiz,
                   size: 20, color: AppColors.textSecondary),
@@ -201,6 +203,7 @@ class _ChatHeaderState extends ConsumerState<ChatHeader> {
                 ),
               ],
             ),
+          ],
         ],
       ),
     );
@@ -208,3 +211,25 @@ class _ChatHeaderState extends ConsumerState<ChatHeader> {
 }
 
 enum _ChatMenuAction { rename, clear }
+
+/// Icon button that toggles verbose tool-call display in the chat.
+class _VerboseToggleButton extends ConsumerWidget {
+  const _VerboseToggleButton();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final verboseOn = ref.watch(verboseModeProvider);
+    return IconButton(
+      icon: Icon(
+        Icons.account_tree_outlined,
+        size: 16,
+        color: verboseOn ? AppColors.accent : AppColors.textMuted,
+      ),
+      onPressed: () =>
+          ref.read(verboseModeProvider.notifier).state = !verboseOn,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(),
+      tooltip: verboseOn ? 'Hide tool activity' : 'Show tool activity',
+    );
+  }
+}
