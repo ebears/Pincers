@@ -65,12 +65,12 @@ The gateway **strips all scopes** from device-less clients using token auth. Pin
 | `chat.send` | Send a user message to a session |
 
 ### Chat Streaming
-Bot responses arrive as `chat.event` events:
+Bot responses arrive as `chat` events:
 - `state:"delta"` — incremental token content (streamed)
-- `state:"final"` — complete response (final message)
+- `state:"final"` — complete response (final message). May omit `message` when the agent emits a silent reply (no content for the client).
 - `state:"error"` / `state:"aborted"` — failure states
 
-Content can be a string or array of `{type:"text", text:"..."}` blocks.
+Content can be a string or array of `{type:"text", text:"..."}` blocks. Final content may carry a trailing incomplete XML tag (e.g. `</`) from LLM streaming artifacts — strip any `<[^>]*$` suffix before display.
 
 ### Client Identity
 - **client.id:** `cli` (from `GATEWAY_CLIENT_IDS` enum)
@@ -99,6 +99,8 @@ Content can be a string or array of `{type:"text", text:"..."}` blocks.
 
 ## Gotchas
 
+- **`chat.send` must not include `deliver: true`** — when set, the gateway routes the response to the session's last external channel (WhatsApp, Telegram, etc.) and sends Pincers only an empty `final` with no content. Omit `deliver` so the gateway responds via the internal WebSocket channel.
+- **Silent replies** — the gateway may send a `final` event with no `message` field. This is intentional: the agent emitted a suppression token and the gateway withheld the output. Pincers logs these and shows nothing.
 - **Session labels** use `pincers-<threadId>` (UUID) to avoid collisions. If a label exists, the code falls back to `sessions.list` to find and reuse it.
 - **Auth validation** (token entry screen) does a throwaway connect handshake to verify credentials before saving — this does NOT use device identity since it only needs to verify the token is accepted.
 - **Reconnection** is automatic with exponential backoff (1s → 30s max). The WebSocket service handles this internally.
