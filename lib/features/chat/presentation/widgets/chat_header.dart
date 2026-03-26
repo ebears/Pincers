@@ -221,7 +221,7 @@ class _VerboseToggleButton extends ConsumerWidget {
     final verboseOn = ref.watch(verboseModeProvider);
     return IconButton(
       icon: Icon(
-        Icons.account_tree_outlined,
+        Icons.account_tree,
         size: 16,
         color: verboseOn ? AppColors.accent : AppColors.textMuted,
       ),

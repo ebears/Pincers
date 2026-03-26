@@ -42,7 +42,10 @@ class ChatBubble extends StatelessWidget {
           ),
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final maxWidth = constraints.maxWidth * AppConstants.bubbleMaxWidthFraction;
+              final maxWidth = constraints.maxWidth *
+                  (isUser
+                      ? AppConstants.bubbleMaxWidthFraction
+                      : AppConstants.botBubbleMaxWidthFraction);
               return Row(
                 mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
                 children: [
@@ -76,7 +79,7 @@ class _BubbleContent extends StatelessWidget {  final MessageModel message;
         color: isUser ? AppColors.userBubble : AppColors.botBubble,
         borderRadius: BorderRadius.only(
           topLeft: const Radius.circular(AppConstants.radiusBubble),
-          topRight: Radius.circular(isUser ? AppConstants.radiusSmall : AppConstants.radiusBubble),
+          topRight: const Radius.circular(AppConstants.radiusBubble),
           bottomLeft: Radius.circular(isUser ? AppConstants.radiusBubble : AppConstants.radiusSmall),
           bottomRight: const Radius.circular(AppConstants.radiusBubble),
         ),

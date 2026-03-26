@@ -81,10 +81,14 @@ class _VerboseBubbleState extends State<VerboseBubble> {
                       ),
                     ),
                   ),
-                  Icon(
-                    _expanded ? Icons.expand_less : Icons.expand_more,
-                    size: 14,
-                    color: AppColors.textMuted,
+                  AnimatedRotation(
+                    turns: _expanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 150),
+                    child: const Icon(
+                      Icons.expand_more,
+                      size: 14,
+                      color: AppColors.textMuted,
+                    ),
                   ),
                 ],
               ),

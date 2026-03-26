@@ -18,7 +18,6 @@ class CodeBlockWidget extends StatefulWidget {
 }
 
 class _CodeBlockWidgetState extends State<CodeBlockWidget> {
-  bool _hovered = false;
   bool _copied = false;
 
   Future<void> _copy() async {
@@ -31,72 +30,64 @@ class _CodeBlockWidgetState extends State<CodeBlockWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: AppConstants.space4),
-        decoration: BoxDecoration(
-          color: AppColors.bgPrimary,
-          borderRadius: BorderRadius.circular(AppConstants.radiusButton),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: AppConstants.space4),
+      decoration: BoxDecoration(
+        color: AppColors.bgPrimary,
+        borderRadius: BorderRadius.circular(AppConstants.radiusButton),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Header bar: language label + copy button
-            if (widget.language != null || _hovered)
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppConstants.space12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  border: Border(bottom: BorderSide(color: AppColors.border)),
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(AppConstants.radiusButton),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    if (widget.language != null)
-                      Text(
-                        widget.language!,
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 11,
-                          letterSpacing: 0.3,
-                        ),
-                      ),
-                    const Spacer(),
-                    AnimatedOpacity(
-                      opacity: _hovered ? 1.0 : 0.0,
-                      duration: const Duration(milliseconds: 150),
-                      child: GestureDetector(
-                        onTap: _copy,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              _copied ? Icons.check : Icons.copy,
-                              size: 13,
-                              color: AppColors.textSecondary,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              _copied ? 'Copied!' : 'Copy',
-                              style: const TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
+            // Header bar: language label + copy button — always visible
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppConstants.space12,
+                vertical: 6,
+              ),
+              decoration: BoxDecoration(
+                border: Border(bottom: BorderSide(color: AppColors.border)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(AppConstants.radiusButton),
                 ),
               ),
+              child: Row(
+                children: [
+                  if (widget.language != null)
+                    Text(
+                      widget.language!,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 11,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: _copy,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _copied ? Icons.check : Icons.copy,
+                          size: 13,
+                          color: AppColors.textSecondary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _copied ? 'Copied!' : 'Copy',
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
             // Code content: max 400px tall, scrollable both axes
             ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 400),
@@ -120,7 +111,6 @@ class _CodeBlockWidgetState extends State<CodeBlockWidget> {
             ),
           ],
         ),
-      ),
     );
   }
 }

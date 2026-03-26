@@ -59,9 +59,9 @@ class _TypingIndicatorState extends State<TypingIndicator>
             decoration: BoxDecoration(
               color: AppColors.botBubble,
               borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(AppConstants.radiusSmall),
+                topLeft: Radius.circular(AppConstants.radiusBubble),
                 topRight: Radius.circular(AppConstants.radiusBubble),
-                bottomLeft: Radius.circular(AppConstants.radiusBubble),
+                bottomLeft: Radius.circular(AppConstants.radiusSmall),
                 bottomRight: Radius.circular(AppConstants.radiusBubble),
               ),
               border: Border.all(color: AppColors.border),

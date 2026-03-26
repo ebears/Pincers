@@ -308,10 +308,10 @@ class _SendButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: onPressed != null ? AppColors.accent : AppColors.bgHover,
-      borderRadius: BorderRadius.circular(AppConstants.radiusButton),
+      shape: const CircleBorder(),
       child: InkWell(
         onTap: onPressed,
-        borderRadius: BorderRadius.circular(AppConstants.radiusButton),
+        customBorder: const CircleBorder(),
         child: Container(
           width: 36,
           height: 36,

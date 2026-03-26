@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -49,11 +50,8 @@ class SettingsPanel extends ConsumerWidget {
                   children: [
                     _InfoRow(label: 'Gateway', value: auth.gatewayUrl ?? '—'),
                     const SizedBox(height: AppConstants.space8),
-                    _InfoRow(
-                      label: 'Token',
-                      value: auth.token != null
-                          ? '${auth.token!.substring(0, auth.token!.length.clamp(0, 8))}••••'
-                          : '—',
+                    _CopyableTokenRow(
+                      token: auth.token,
                     ),
                     const SizedBox(height: AppConstants.space16),
                     TextButton.icon(
@@ -118,6 +116,56 @@ class _InfoRow extends StatelessWidget {
       children: [
         SizedBox(width: 60, child: Text(label, style: AppTypography.settingsLabel)),
         Expanded(child: Text(value, style: AppTypography.settingsValue)),
+      ],
+    );
+  }
+}
+
+class _CopyableTokenRow extends StatefulWidget {
+  final String? token;
+  const _CopyableTokenRow({this.token});
+
+  @override
+  State<_CopyableTokenRow> createState() => _CopyableTokenRowState();
+}
+
+class _CopyableTokenRowState extends State<_CopyableTokenRow> {
+  bool _copied = false;
+
+  String get _masked {
+    if (widget.token == null) return '—';
+    final prefix = widget.token!.substring(0, widget.token!.length.clamp(0, 8));
+    return '$prefix••••';
+  }
+
+  Future<void> _copy() async {
+    if (widget.token == null) return;
+    await Clipboard.setData(ClipboardData(text: widget.token!));
+    if (!mounted) return;
+    setState(() => _copied = true);
+    await Future<void>.delayed(const Duration(seconds: 2));
+    if (mounted) setState(() => _copied = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        SizedBox(width: 60, child: Text('Token', style: AppTypography.settingsLabel)),
+        Expanded(child: Text(_masked, style: AppTypography.settingsValue)),
+        if (widget.token != null)
+          IconButton(
+            onPressed: _copy,
+            icon: Icon(
+              _copied ? Icons.check : Icons.copy,
+              size: 14,
+              color: _copied ? AppColors.success : AppColors.textSecondary,
+            ),
+            tooltip: _copied ? 'Copied!' : 'Copy token',
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
       ],
     );
   }
