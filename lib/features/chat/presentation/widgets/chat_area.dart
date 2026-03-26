@@ -155,6 +155,7 @@ class _ChatAreaState extends ConsumerState<ChatArea> {
           children: [
             const ChatHeader(),
             Expanded(
+              child: SelectionArea(
               child: ListView.builder(
                 controller: _scrollController,
                 padding: const EdgeInsets.symmetric(vertical: AppConstants.space24),
@@ -179,6 +180,7 @@ class _ChatAreaState extends ConsumerState<ChatArea> {
                     isNew ? _AnimatedMessageEntry(child: bubbleWidget) : bubbleWidget,
                   );
                 },
+              ),
               ),
             ),
             if (_hasError)

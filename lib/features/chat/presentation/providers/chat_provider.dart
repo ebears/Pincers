@@ -332,10 +332,20 @@ class ChatNotifier extends StateNotifier<List<MessageModel>> {
     return '${t.substring(0, 30)}|${t.length}|${t.substring(t.length - 30)}';
   }
 
-  /// Strip any trailing incomplete XML/HTML tag (e.g. `</` or `</think`) that
-  /// some LLMs emit as streaming artifacts before the gateway sends `final`.
-  String _stripTrailingTag(String s) =>
-      s.replaceFirst(RegExp(r'<[^>]*$'), '').trimRight();
+  /// Strip agent artifacts from message content:
+  /// - Leading `[[directive]]` tokens (e.g. `[[reply_to_current]]`)
+  /// - Trailing complete agent XML tags (e.g. `</final>`)
+  /// - Trailing incomplete XML/HTML tags (e.g. `</` or `</think`) from LLM streaming
+  String _stripTrailingTag(String s) {
+    var result = s;
+    // Strip leading [[...]] directive tokens.
+    result = result.replaceAll(RegExp(r'^\[\[[^\]]*\]\]\s*', multiLine: false), '');
+    // Strip trailing complete closing XML tags (e.g. </final>).
+    result = result.replaceFirst(RegExp(r'</\w+>\s*$'), '');
+    // Strip trailing incomplete XML/HTML tag artifacts.
+    result = result.replaceFirst(RegExp(r'<[^>]*$'), '');
+    return result.trimRight();
+  }
 
   /// Extract text content from a message payload.
   String _extractContent(Map<String, dynamic>? message) {

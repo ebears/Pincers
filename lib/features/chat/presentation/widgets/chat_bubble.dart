@@ -106,12 +106,23 @@ class _BubbleContent extends StatelessWidget {  final MessageModel message;
         border: isUser ? null : Border.all(color: AppColors.border),
       ),
       child: isUser
-          ? Text(message.content, style: AppTypography.chatMessage.copyWith(color: Colors.white))
+          ? Theme(
+              data: Theme.of(context).copyWith(
+                textSelectionTheme: const TextSelectionThemeData(
+                  selectionColor: Colors.white38,
+                ),
+              ),
+              child: MarkdownBody(
+                data: message.content,
+                styleSheet: buildUserMarkdownStyleSheet(),
+                builders: buildCodeBlockBuilders(),
+                sizedImageBuilder: (MarkdownImageConfig config) => _TappableImage(uri: config.uri),
+              ),
+            )
           : MarkdownBody(
               data: message.content,
               styleSheet: buildMarkdownStyleSheet(),
               builders: buildCodeBlockBuilders(),
-              selectable: true,
               sizedImageBuilder: (MarkdownImageConfig config) => _TappableImage(uri: config.uri),
             ),
     );

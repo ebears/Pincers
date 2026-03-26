@@ -26,6 +26,34 @@ MarkdownStyleSheet buildMarkdownStyleSheet() {
   );
 }
 
+MarkdownStyleSheet buildUserMarkdownStyleSheet() {
+  const textStyle = TextStyle(color: Colors.white);
+  final base = AppTypography.chatMessage.merge(textStyle);
+  return MarkdownStyleSheet(
+    p: base,
+    strong: base.copyWith(fontWeight: FontWeight.bold),
+    em: base.copyWith(fontStyle: FontStyle.italic),
+    h1: base.copyWith(fontSize: 22, fontWeight: FontWeight.bold),
+    h2: base.copyWith(fontSize: 19, fontWeight: FontWeight.bold),
+    h3: base.copyWith(fontSize: 17, fontWeight: FontWeight.bold),
+    code: AppTypography.codeBlock.copyWith(
+      color: Colors.white,
+      backgroundColor: Colors.white12,
+    ),
+    codeblockDecoration: BoxDecoration(
+      color: Colors.white12,
+      borderRadius: BorderRadius.circular(8),
+    ),
+    blockquote: base.copyWith(color: Colors.white70),
+    listBullet: base,
+    a: base.copyWith(
+      color: Colors.white,
+      decoration: TextDecoration.underline,
+      decorationColor: Colors.white70,
+    ),
+  );
+}
+
 Map<String, MarkdownElementBuilder> buildCodeBlockBuilders() {
   return {'code': CodeElementBuilder()};
 }
