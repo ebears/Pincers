@@ -42,7 +42,7 @@ class WebSocketService {
   ConnectionStatus get status => _status;
   HelloResult? get helloResult => _helloResult;
 
-  /// Stream of all gateway event frames (chat.event, tick, etc.).
+  /// Stream of all gateway event frames (chat, tick, etc.).
   Stream<Map<String, dynamic>> get events => _eventController.stream;
 
   void _setStatus(ConnectionStatus s) {

@@ -45,7 +45,7 @@ class ChatNotifier extends StateNotifier<List<MessageModel>> {
 
     final event = msg['event'] as String?;
     debugPrint('[Pincers] Gateway event: $event');
-    if (event == 'chat.event') {
+    if (event == 'chat') {
       final payload = (msg['payload'] as Map<String, dynamic>?) ?? {};
       _handleChatEvent(payload);
     }
@@ -56,6 +56,8 @@ class ChatNotifier extends StateNotifier<List<MessageModel>> {
     final runId = payload['runId'] as String?;
     final sessionKey = payload['sessionKey'] as String?;
     final message = payload['message'] as Map<String, dynamic>?;
+
+    debugPrint('[Pincers] chat event: state=$eventState runId=$runId');
 
     if (runId == null) return;
 
@@ -73,7 +75,7 @@ class ChatNotifier extends StateNotifier<List<MessageModel>> {
         _handleFinal(runId, threadId, message);
       case 'error':
       case 'aborted':
-        _handleErrorOrAbort(runId, payload);
+        _handleErrorOrAbort(runId, threadId, payload);
     }
   }
 
@@ -128,12 +130,13 @@ class ChatNotifier extends StateNotifier<List<MessageModel>> {
       String runId, String threadId, Map<String, dynamic>? message) {
     _ref.read(typingProvider.notifier).state = false;
 
+    final content = _stripTrailingTag(_extractContent(message));
+
     if (_streamingIds.containsKey(runId)) {
       // Finalize the streaming message.
       final id = _streamingIds[runId]!;
-      final content = _extractContent(message);
       if (content.isNotEmpty) {
-        // Use the final content from the server if provided.
+        // Replace accumulated delta content with the authoritative final text.
         state = [
           for (final m in state)
             if (m.id == id)
@@ -154,16 +157,24 @@ class ChatNotifier extends StateNotifier<List<MessageModel>> {
       _cleanupRun(runId);
       _ref.read(threadsProvider.notifier).touchThread(threadId);
     } else {
-      // No deltas preceded this — treat as a complete non-streaming response.
-      final content = _extractContent(message);
+      // No deltas preceded this — either a non-streaming response or a gateway
+      // "silent reply" (agent intentionally suppressed output). Only show a
+      // message if there's actually content.
       if (content.isNotEmpty) {
         _receiveBotMessage(threadId, content);
+      } else {
+        debugPrint('[Pincers] Silent reply: agent sent no content for run $runId');
       }
     }
   }
 
-  void _handleErrorOrAbort(String runId, Map<String, dynamic> payload) {
+  void _handleErrorOrAbort(String runId, String threadId, Map<String, dynamic> payload) {
     _ref.read(typingProvider.notifier).state = false;
+
+    final eventState = payload['state'] as String?;
+    final errorMsg = (payload['error'] as Map<String, dynamic>?)?['message'] as String?
+        ?? payload['message'] as String?;
+    debugPrint('[Pincers] chat $eventState: $errorMsg');
 
     if (_streamingIds.containsKey(runId)) {
       // Persist whatever we accumulated.
@@ -173,6 +184,12 @@ class ChatNotifier extends StateNotifier<List<MessageModel>> {
         _repo.saveMessage(msg);
       }
       _cleanupRun(runId);
+    } else {
+      // No deltas — show an error bubble so the user knows something went wrong.
+      final display = eventState == 'aborted'
+          ? 'Response was stopped.'
+          : (errorMsg?.isNotEmpty == true ? errorMsg! : 'An error occurred. Please try again.');
+      _receiveBotMessage(threadId, display);
     }
   }
 
@@ -181,6 +198,11 @@ class ChatNotifier extends StateNotifier<List<MessageModel>> {
     _streamingBuffers.remove(runId);
     _runThreadMap.remove(runId);
   }
+
+  /// Strip any trailing incomplete XML/HTML tag (e.g. `</` or `</think`) that
+  /// some LLMs emit as streaming artifacts before the gateway sends `final`.
+  String _stripTrailingTag(String s) =>
+      s.replaceFirst(RegExp(r'<[^>]*$'), '').trimRight();
 
   /// Extract text content from a message payload.
   String _extractContent(Map<String, dynamic>? message) {
@@ -312,7 +334,6 @@ class ChatNotifier extends StateNotifier<List<MessageModel>> {
           'message': content,
           if (formattedAttachments.isNotEmpty)
             'attachments': formattedAttachments,
-          'deliver': true,
           'idempotencyKey': msg.id,
         },
       );

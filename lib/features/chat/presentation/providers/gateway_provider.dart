@@ -49,7 +49,7 @@ class GatewayNotifier extends StateNotifier<GatewayState> {
     }
   }
 
-  /// Stream of gateway event frames (chat.event, tick, etc.).
+  /// Stream of gateway event frames (chat, tick, etc.).
   Stream<Map<String, dynamic>> get events => _ws.events;
 
   /// Wait for the gateway to reach connected state, triggering a connect

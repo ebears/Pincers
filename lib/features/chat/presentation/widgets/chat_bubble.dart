@@ -21,7 +21,6 @@ class ChatBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final showTimestamp = TimeUtils.shouldShowTimestamp(previousMessageTime, message.createdAt);
     final isUser = message.isUser;
-    final maxWidth = MediaQuery.of(context).size.width * AppConstants.bubbleMaxWidthFraction;
 
     return Column(
       crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
@@ -41,14 +40,19 @@ class ChatBubble extends StatelessWidget {
             horizontal: AppConstants.space16,
             vertical: 3,
           ),
-          child: Row(
-            mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
-            children: [
-              ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: maxWidth),
-                child: _BubbleContent(message: message, isUser: isUser),
-              ),
-            ],
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final maxWidth = constraints.maxWidth * AppConstants.bubbleMaxWidthFraction;
+              return Row(
+                mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+                children: [
+                  ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: maxWidth),
+                    child: _BubbleContent(message: message, isUser: isUser),
+                  ),
+                ],
+              );
+            },
           ),
         ),
       ],
