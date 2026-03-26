@@ -22,6 +22,14 @@ class ChatNotifier extends StateNotifier<List<MessageModel>> {
   final Map<String, StringBuffer> _streamingBuffers = {};
   /// Maps runId → threadId so we know which thread a streaming run belongs to
   final Map<String, String> _runThreadMap = {};
+  /// Tracks which sessions this connection is subscribed to: sessionKey → connId.
+  /// Used to avoid re-subscribing on the same connection and to detect reconnection.
+  final Map<String, String> _subscribedSessions = {};
+  /// Maps runId → sessionKey so _handleFinal can check subscription status.
+  final Map<String, String> _runSessionMap = {};
+  /// Fingerprints of content recently finalized via streaming, used to
+  /// de-duplicate session.message events that arrive after streaming completes.
+  final Map<String, DateTime> _recentStreamedContents = {};
 
   StreamSubscription<Map<String, dynamic>>? _eventSub;
 
@@ -48,6 +56,9 @@ class ChatNotifier extends StateNotifier<List<MessageModel>> {
     if (event == 'chat') {
       final payload = (msg['payload'] as Map<String, dynamic>?) ?? {};
       _handleChatEvent(payload);
+    } else if (event == 'session.message') {
+      final payload = (msg['payload'] as Map<String, dynamic>?) ?? {};
+      _handleSessionMessage(payload);
     }
   }
 
@@ -65,8 +76,9 @@ class ChatNotifier extends StateNotifier<List<MessageModel>> {
     final threadId = _resolveThreadId(sessionKey);
     if (threadId == null) return;
 
-    // Track which thread this run belongs to.
+    // Track which thread and session this run belongs to.
     _runThreadMap[runId] = threadId;
+    if (sessionKey != null) _runSessionMap[runId] = sessionKey;
 
     switch (eventState) {
       case 'delta':
@@ -154,16 +166,25 @@ class ChatNotifier extends StateNotifier<List<MessageModel>> {
       }
       final finalMsg = state.firstWhere((m) => m.id == id);
       _repo.saveMessage(finalMsg);
+      _markContentAsStreamed(finalMsg.content);
       _cleanupRun(runId);
       _ref.read(threadsProvider.notifier).touchThread(threadId);
     } else {
       // No deltas preceded this — either a non-streaming response or a gateway
-      // "silent reply" (agent intentionally suppressed output). Only show a
-      // message if there's actually content.
+      // "silent reply" (agent intentionally suppressed output).
       if (content.isNotEmpty) {
-        _receiveBotMessage(threadId, content);
+        // When subscribed to session.message events, the same content will
+        // arrive (or already has) via session.message — suppress here to avoid
+        // duplicates. Fall back to direct display when not subscribed.
+        final sessKey = _runSessionMap.remove(runId);
+        final subscribed =
+            sessKey != null && _subscribedSessions.containsKey(sessKey);
+        if (!subscribed) {
+          _receiveBotMessage(threadId, content);
+        }
       } else {
-        debugPrint('[Pincers] Silent reply: agent sent no content for run $runId');
+        debugPrint(
+            '[Pincers] Silent reply: agent sent no content for run $runId');
       }
     }
   }
@@ -197,6 +218,63 @@ class ChatNotifier extends StateNotifier<List<MessageModel>> {
     _streamingIds.remove(runId);
     _streamingBuffers.remove(runId);
     _runThreadMap.remove(runId);
+    _runSessionMap.remove(runId);
+  }
+
+  /// Handles a `session.message` event from the gateway.
+  ///
+  /// When subscribed via `sessions.messages.subscribe`, the gateway delivers
+  /// ALL messages for the session — including multi-run tool-call responses
+  /// that never arrive via `chat` events alone (the `chat.send` run ends with
+  /// a silent final while the actual answer lands in a separate run).
+  ///
+  /// We display only final assistant messages with visible text, skipping tool
+  /// calls (stopReason: toolUse), thinking blocks, user echoes, and anything
+  /// already shown via streaming `chat` events.
+  void _handleSessionMessage(Map<String, dynamic> payload) {
+    final message = payload['message'] as Map<String, dynamic>?;
+    if (message == null) return;
+
+    // Only process final assistant messages (skip user echoes and tool calls).
+    if ((message['role'] as String?) != 'assistant') return;
+    if ((message['stopReason'] as String?) != 'stop') return;
+
+    // Extract visible text — thinking/toolCall blocks yield an empty string.
+    final content = _stripTrailingTag(_extractContent(message));
+    if (content.isEmpty) return;
+
+    // Skip if this content was just finalized via streaming chat events.
+    if (_wasRecentlyStreamed(content)) return;
+
+    final sessionKey = payload['sessionKey'] as String?;
+    final threadId = _resolveThreadId(sessionKey);
+    if (threadId == null) return;
+
+    _receiveBotMessage(threadId, content);
+  }
+
+  void _markContentAsStreamed(String content) {
+    if (content.isEmpty) return;
+    _recentStreamedContents[_contentFingerprint(content)] = DateTime.now();
+  }
+
+  bool _wasRecentlyStreamed(String content) {
+    final fp = _contentFingerprint(content);
+    final when = _recentStreamedContents[fp];
+    if (when == null) return false;
+    if (DateTime.now().difference(when).inSeconds > 5) {
+      _recentStreamedContents.remove(fp);
+      return false;
+    }
+    return true;
+  }
+
+  /// Short fingerprint to detect duplicate content across chat/session.message
+  /// event paths without comparing full strings.
+  String _contentFingerprint(String s) {
+    final t = s.trim();
+    if (t.length <= 60) return t;
+    return '${t.substring(0, 30)}|${t.length}|${t.substring(t.length - 30)}';
   }
 
   /// Strip any trailing incomplete XML/HTML tag (e.g. `</` or `</think`) that
@@ -284,6 +362,34 @@ class ChatNotifier extends StateNotifier<List<MessageModel>> {
     }
   }
 
+  /// Subscribes this WebSocket connection to all chat events for [sessionKey].
+  ///
+  /// The gateway only delivers multi-run responses (tool calls, verbose output)
+  /// to connections that have explicitly subscribed via `sessions.messages.subscribe`.
+  /// Without this, Pincers only receives events for the single run directly
+  /// tied to its `chat.send` request, and gets a silent final for everything else.
+  ///
+  /// Subscriptions are per-connection — they must be re-established after
+  /// reconnection. [_subscribedSessions] tracks sessionKey → connId so we
+  /// skip redundant calls on the same connection.
+  Future<void> _subscribeToSessionIfNeeded(String sessionKey) async {
+    final connId = _ref.read(gatewayProvider).hello?.connId;
+    if (connId == null) return;
+    if (_subscribedSessions[sessionKey] == connId) return;
+
+    try {
+      await _ref.read(gatewayProvider.notifier).sendRequest(
+        'sessions.messages.subscribe',
+        {'key': sessionKey},
+      );
+      _subscribedSessions[sessionKey] = connId;
+      debugPrint('[Pincers] Subscribed to session events: $sessionKey');
+    } catch (e) {
+      debugPrint('[Pincers] Session subscribe failed (non-fatal): $e');
+    }
+  }
+
+
   Future<void> sendMessage(String threadId, String content,
       {List<AttachmentModel> attachments = const []}) async {
     // Optimistically add user message.
@@ -323,6 +429,10 @@ class ChatNotifier extends StateNotifier<List<MessageModel>> {
 
       final sessionKey = await _ensureSession(threadId);
       debugPrint('[Pincers] Session key: $sessionKey, sending chat.send...');
+
+      // Subscribe to receive all chat events for this session, including
+      // multi-run responses produced when the agent uses tools.
+      await _subscribeToSessionIfNeeded(sessionKey);
 
       // Format attachments per OpenClaw spec.
       final formattedAttachments = attachments.map(_formatAttachment).toList();
