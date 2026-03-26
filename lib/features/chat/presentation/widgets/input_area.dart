@@ -179,15 +179,16 @@ class _InputAreaState extends ConsumerState<InputArea> {
                         ),
                       ),
                       Expanded(
-                        child: KeyboardListener(
-                          focusNode: FocusNode(),
-                          onKeyEvent: (event) {
+                        child: Focus(
+                          onKeyEvent: (node, event) {
                             if (event is KeyDownEvent &&
                                 event.logicalKey ==
                                     LogicalKeyboardKey.enter &&
                                 !HardwareKeyboard.instance.isShiftPressed) {
                               _send();
+                              return KeyEventResult.handled;
                             }
+                            return KeyEventResult.ignored;
                           },
                           child: TextField(
                             controller: _controller,
@@ -207,7 +208,6 @@ class _InputAreaState extends ConsumerState<InputArea> {
                               filled: false,
                             ),
                             onChanged: (_) => setState(() {}),
-                            onSubmitted: (_) => _send(),
                           ),
                         ),
                       ),
