@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:uuid/uuid.dart';
 import '../../../../shared/services/websocket_channel_factory.dart';
 
 const _tokenKey = 'gateway_token';
@@ -83,6 +85,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await saveCredentials(gatewayUrl, token, trustSelfSigned: trustSelfSigned);
   }
 
+  /// Opens a WebSocket, performs the OpenClaw connect handshake, and checks
+  /// that the gateway accepts the token before saving credentials.
   Future<void> _validateConnection(
     String gatewayUrl,
     String token,
@@ -95,7 +99,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
         const Duration(seconds: 10),
         onTimeout: () => throw const AuthException(AuthFailureReason.timeout),
       );
-      channel.sink.close();
+
+      try {
+        await _performConnectHandshake(channel, token);
+      } finally {
+        channel.sink.close();
+      }
     } on AuthException {
       rethrow;
     } on TimeoutException {
@@ -126,6 +135,71 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
       throw AuthException(AuthFailureReason.generic, detail: raw);
     }
+  }
+
+  static const _uuid = Uuid();
+
+  /// Waits for the connect.challenge event, sends a connect request with the
+  /// token, and verifies the gateway responds with hello-ok.
+  Future<void> _performConnectHandshake(dynamic channel, String token) async {
+    final stream = channel.stream.map<Map<String, dynamic>>(
+      (data) => jsonDecode(data as String) as Map<String, dynamic>,
+    );
+
+    // Wait for connect.challenge from the gateway.
+    final challenge = await stream.first.timeout(
+      const Duration(seconds: 10),
+      onTimeout: () => throw const AuthException(AuthFailureReason.timeout),
+    );
+
+    if (challenge['type'] != 'event' ||
+        challenge['event'] != 'connect.challenge') {
+      throw const AuthException(
+        AuthFailureReason.generic,
+        detail: 'Expected connect.challenge from gateway',
+      );
+    }
+
+    // Send connect request with auth token.
+    final reqId = _uuid.v4();
+    channel.sink.add(jsonEncode({
+      'type': 'req',
+      'id': reqId,
+      'method': 'connect',
+      'params': {
+        'minProtocol': 3,
+        'maxProtocol': 3,
+        'client': {
+          'id': 'pincers',
+          'version': '1.0.0',
+          'platform': 'flutter',
+          'mode': 'operator',
+        },
+        'role': 'operator',
+        'scopes': ['operator.read', 'operator.write'],
+        'caps': [],
+        'commands': [],
+        'permissions': {},
+        'auth': {'token': token},
+        'locale': 'en-US',
+        'userAgent': 'pincers/1.0.0',
+      },
+    }));
+
+    // Wait for the response.
+    final response = await stream.first.timeout(
+      const Duration(seconds: 10),
+      onTimeout: () => throw const AuthException(AuthFailureReason.timeout),
+    );
+
+    if (response['type'] == 'res' && response['ok'] == true) {
+      return; // hello-ok — token is valid
+    }
+
+    // The gateway rejected the connect request.
+    final error = response['error'];
+    final errorMsg = error is Map ? (error['message'] ?? '$error') : '$response';
+    throw AuthException(AuthFailureReason.authRejected, detail: '$errorMsg');
   }
 
   Future<void> saveCredentials(
