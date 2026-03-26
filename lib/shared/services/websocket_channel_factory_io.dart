@@ -18,12 +18,11 @@ Future<WebSocketChannel> createChannel(
       ..badCertificateCallback = (cert, host, port) => true;
     final socket = await WebSocket.connect(
       effectiveUri.toString(),
-      protocols: ['Bearer $token'],
       customClient: client,
     );
     return IOWebSocketChannel(socket);
   }
-  final channel = WebSocketChannel.connect(uri, protocols: ['Bearer $token']);
+  final channel = WebSocketChannel.connect(uri);
   await channel.ready;
   return channel;
 }

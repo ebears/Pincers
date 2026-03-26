@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import 'websocket_channel_factory.dart';
 
 enum ConnectionStatus { disconnected, connecting, connected, reconnecting, error }
 
@@ -13,6 +14,7 @@ class WebSocketService {
   ConnectionStatus _status = ConnectionStatus.disconnected;
   String? _gatewayUrl;
   String? _token;
+  bool _trustSelfSigned = false;
   bool _intentionalDisconnect = false;
   int _reconnectAttempt = 0;
   Timer? _reconnectTimer;
@@ -27,22 +29,22 @@ class WebSocketService {
     onStatusChange?.call(s);
   }
 
-  Future<void> connect(String gatewayUrl, String token) async {
+  Future<void> connect(String gatewayUrl, String token, {bool trustSelfSigned = false}) async {
     _intentionalDisconnect = false;
     _reconnectAttempt = 0;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
     _gatewayUrl = gatewayUrl;
     _token = token;
+    _trustSelfSigned = trustSelfSigned;
     await _doConnect();
   }
 
   Future<void> _doConnect() async {
     _setStatus(ConnectionStatus.connecting);
     try {
-      final uri = Uri.parse('${_gatewayUrl!}/rpc');
-      _channel = WebSocketChannel.connect(uri, protocols: ['Bearer $_token']);
-      await _channel!.ready;
+      final uri = Uri.parse(_gatewayUrl!);
+      _channel = await createChannel(uri, _token!, _trustSelfSigned);
       _reconnectAttempt = 0;
       _setStatus(ConnectionStatus.connected);
       _channel!.stream.listen(
