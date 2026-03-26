@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:cross_file/cross_file.dart';
 import 'package:mime/mime.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -10,6 +12,9 @@ import '../../../../core/constants/app_constants.dart';
 import '../../data/models/attachment_model.dart';
 
 const _uuid = Uuid();
+
+/// Provider that DropTarget in ChatArea writes to; InputArea consumes it.
+final droppedFilesProvider = StateProvider<List<XFile>>((ref) => const []);
 
 class _PendingFile {
   final String name;
@@ -25,17 +30,17 @@ class _PendingFile {
   });
 }
 
-class InputArea extends StatefulWidget {
+class InputArea extends ConsumerStatefulWidget {
   final void Function(String content, List<AttachmentModel> attachments) onSend;
   final bool enabled;
 
   const InputArea({super.key, required this.onSend, this.enabled = true});
 
   @override
-  State<InputArea> createState() => _InputAreaState();
+  ConsumerState<InputArea> createState() => _InputAreaState();
 }
 
-class _InputAreaState extends State<InputArea> {
+class _InputAreaState extends ConsumerState<InputArea> {
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
   final List<_PendingFile> _pendingFiles = [];
@@ -45,6 +50,20 @@ class _InputAreaState extends State<InputArea> {
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
+  }
+
+  Future<void> _processDroppedFiles(List<XFile> files) async {
+    final newFiles = await Future.wait(files.map((f) async {
+      final bytes = await f.readAsBytes();
+      final mime = lookupMimeType(f.name) ?? 'application/octet-stream';
+      return _PendingFile(
+        name: f.name,
+        mimeType: mime,
+        sizeBytes: bytes.length,
+        bytes: bytes,
+      );
+    }));
+    if (mounted) setState(() => _pendingFiles.addAll(newFiles));
   }
 
   Future<void> _pickFiles() async {
@@ -89,6 +108,14 @@ class _InputAreaState extends State<InputArea> {
 
   @override
   Widget build(BuildContext context) {
+    // Consume dropped files from DropTarget in ChatArea
+    ref.listen<List<XFile>>(droppedFilesProvider, (_, files) {
+      if (files.isNotEmpty) {
+        _processDroppedFiles(files);
+        ref.read(droppedFilesProvider.notifier).state = const [];
+      }
+    });
+
     final canSend = widget.enabled &&
         (_controller.text.trim().isNotEmpty || _pendingFiles.isNotEmpty);
 

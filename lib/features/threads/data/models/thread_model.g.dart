@@ -22,13 +22,14 @@ class ThreadModelAdapter extends TypeAdapter<ThreadModel> {
       createdAt: fields[2] as DateTime,
       updatedAt: fields[3] as DateTime,
       sessionId: fields[4] as String?,
+      preview: fields[5] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, ThreadModel obj) {
     writer
-      ..writeByte(5)
+      ..writeByte(6)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -38,7 +39,9 @@ class ThreadModelAdapter extends TypeAdapter<ThreadModel> {
       ..writeByte(3)
       ..write(obj.updatedAt)
       ..writeByte(4)
-      ..write(obj.sessionId);
+      ..write(obj.sessionId)
+      ..writeByte(5)
+      ..write(obj.preview);
   }
 
   @override

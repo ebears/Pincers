@@ -147,6 +147,9 @@ class ChatNotifier extends StateNotifier<List<MessageModel>> {
           ? content.substring(0, AppConstants.threadTitleMaxLength)
           : content;
       await _ref.read(threadsProvider.notifier).updateTitle(threadId, title);
+      // Also set the preview from the first message
+      final preview = content.length > 60 ? content.substring(0, 60) : content;
+      await _ref.read(threadsProvider.notifier).updatePreview(threadId, preview);
     }
     await _ref.read(threadsProvider.notifier).touchThread(threadId);
 

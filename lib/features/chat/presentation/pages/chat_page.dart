@@ -129,7 +129,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                                   }
                                 }
                               : null,
-                          child: const ChatArea(),
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 150),
+                            child: KeyedSubtree(
+                              key: ValueKey(selectedId),
+                              child: const ChatArea(),
+                            ),
+                          ),
                         ),
                       ),
                     ],

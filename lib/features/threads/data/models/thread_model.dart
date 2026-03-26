@@ -19,11 +19,15 @@ class ThreadModel extends HiveObject {
   @HiveField(4)
   String? sessionId;
 
+  @HiveField(5)
+  String? preview;
+
   ThreadModel({
     required this.id,
     required this.title,
     required this.createdAt,
     required this.updatedAt,
     this.sessionId,
+    this.preview,
   });
 }

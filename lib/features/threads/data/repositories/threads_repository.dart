@@ -21,6 +21,14 @@ class ThreadsRepository {
     await _box.delete(id);
   }
 
+  Future<void> updatePreview(String id, String preview) async {
+    final thread = _box.get(id);
+    if (thread != null) {
+      thread.preview = preview;
+      await thread.save();
+    }
+  }
+
   Future<void> updateTitle(String id, String title) async {
     final thread = _box.get(id);
     if (thread != null) {

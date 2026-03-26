@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:desktop_drop/desktop_drop.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../threads/presentation/providers/threads_provider.dart';
@@ -24,6 +25,7 @@ class ChatArea extends ConsumerStatefulWidget {
 class _ChatAreaState extends ConsumerState<ChatArea> {
   final _scrollController = ScrollController();
   bool _hasError = false;
+  bool _isDragOver = false;
   final Set<String> _newMessageIds = {};
 
   @override
@@ -92,66 +94,83 @@ class _ChatAreaState extends ConsumerState<ChatArea> {
     final isReconnecting = gatewayStatus == GatewayStatus.reconnecting;
     final extraItems = isTyping ? 1 : (isReconnecting ? 1 : 0);
 
-    return Column(
-      children: [
-        const ChatHeader(),
-        Expanded(
-          child: ListView.builder(
-            controller: _scrollController,
-            padding: const EdgeInsets.symmetric(vertical: AppConstants.space24),
-            itemCount: messages.length + extraItems,
-            itemBuilder: (context, index) {
-              if (index == messages.length) {
-                if (isTyping) return _centeredWidget(const TypingIndicator());
-                if (isReconnecting) {
-                  return _centeredWidget(const _ReconnectingIndicator());
-                }
-              }
-              final msg = messages[index];
-              final prev =
-                  index > 0 ? messages[index - 1].createdAt : null;
-              final bubble =
-                  ChatBubble(message: msg, previousMessageTime: prev);
-              final isNew = _newMessageIds.contains(msg.id);
-              return _centeredWidget(
-                isNew ? _AnimatedMessageEntry(child: bubble) : bubble,
-              );
-            },
-          ),
-        ),
-        if (_hasError)
-          Container(
-            color: AppColors.error.withValues(alpha: 0.15),
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppConstants.space16,
-              vertical: AppConstants.space8,
+    return DropTarget(
+      onDragEntered: (_) => setState(() => _isDragOver = true),
+      onDragExited: (_) => setState(() => _isDragOver = false),
+      onDragDone: (detail) {
+        setState(() => _isDragOver = false);
+        ref.read(droppedFilesProvider.notifier).state = detail.files;
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        decoration: _isDragOver
+            ? BoxDecoration(
+                border: Border.all(color: AppColors.accent, width: 2),
+                borderRadius: BorderRadius.circular(AppConstants.radiusButton),
+              )
+            : null,
+        child: Column(
+          children: [
+            const ChatHeader(),
+            Expanded(
+              child: ListView.builder(
+                controller: _scrollController,
+                padding: const EdgeInsets.symmetric(vertical: AppConstants.space24),
+                itemCount: messages.length + extraItems,
+                itemBuilder: (context, index) {
+                  if (index == messages.length) {
+                    if (isTyping) return _centeredWidget(const TypingIndicator());
+                    if (isReconnecting) {
+                      return _centeredWidget(const _ReconnectingIndicator());
+                    }
+                  }
+                  final msg = messages[index];
+                  final prev =
+                      index > 0 ? messages[index - 1].createdAt : null;
+                  final bubble =
+                      ChatBubble(message: msg, previousMessageTime: prev);
+                  final isNew = _newMessageIds.contains(msg.id);
+                  return _centeredWidget(
+                    isNew ? _AnimatedMessageEntry(child: bubble) : bubble,
+                  );
+                },
+              ),
             ),
-            child: Row(
-              children: [
-                const Icon(Icons.error_outline,
-                    color: AppColors.error, size: 16),
-                const SizedBox(width: AppConstants.space8),
-                Expanded(
-                  child: Text(
-                    "Couldn't send. Tap to retry.",
-                    style: TextStyle(color: AppColors.error, fontSize: 13),
-                  ),
+            if (_hasError)
+              Container(
+                color: AppColors.error.withValues(alpha: 0.15),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppConstants.space16,
+                  vertical: AppConstants.space8,
                 ),
-                IconButton(
-                  icon: const Icon(Icons.close,
-                      size: 16, color: AppColors.error),
-                  onPressed: () => setState(() => _hasError = false),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
+                child: Row(
+                  children: [
+                    const Icon(Icons.error_outline,
+                        color: AppColors.error, size: 16),
+                    const SizedBox(width: AppConstants.space8),
+                    Expanded(
+                      child: Text(
+                        "Couldn't send. Tap to retry.",
+                        style: TextStyle(color: AppColors.error, fontSize: 13),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close,
+                          size: 16, color: AppColors.error),
+                      onPressed: () => setState(() => _hasError = false),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
                 ),
-              ],
+              ),
+            InputArea(
+              onSend: _sendMessage,
+              enabled: isConnected,
             ),
-          ),
-        InputArea(
-          onSend: _sendMessage,
-          enabled: isConnected,
+          ],
         ),
-      ],
+      ),
     );
   }
 

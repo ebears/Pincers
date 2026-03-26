@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 const _tokenKey = 'gateway_token';
 const _urlKey = 'gateway_url';
@@ -31,23 +31,23 @@ class AuthNotifier extends StateNotifier<AuthState> {
     _loadCredentials();
   }
 
-  Box get _box => Hive.box('settings');
+  static const _storage = FlutterSecureStorage();
 
   Future<void> _loadCredentials() async {
-    final token = _box.get(_tokenKey) as String?;
-    final url = _box.get(_urlKey) as String?;
+    final token = await _storage.read(key: _tokenKey);
+    final url = await _storage.read(key: _urlKey);
     state = AuthState(token: token, gatewayUrl: url, isLoading: false);
   }
 
   Future<void> saveCredentials(String gatewayUrl, String token) async {
-    await _box.put(_tokenKey, token);
-    await _box.put(_urlKey, gatewayUrl);
+    await _storage.write(key: _tokenKey, value: token);
+    await _storage.write(key: _urlKey, value: gatewayUrl);
     state = AuthState(token: token, gatewayUrl: gatewayUrl);
   }
 
   Future<void> clearCredentials() async {
-    await _box.delete(_tokenKey);
-    await _box.delete(_urlKey);
+    await _storage.delete(key: _tokenKey);
+    await _storage.delete(key: _urlKey);
     state = const AuthState();
   }
 }

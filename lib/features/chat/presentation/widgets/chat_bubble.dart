@@ -56,8 +56,7 @@ class ChatBubble extends StatelessWidget {
   }
 }
 
-class _BubbleContent extends StatelessWidget {
-  final MessageModel message;
+class _BubbleContent extends StatelessWidget {  final MessageModel message;
   final bool isUser;
 
   const _BubbleContent({required this.message, required this.isUser});
@@ -86,7 +85,47 @@ class _BubbleContent extends StatelessWidget {
               styleSheet: buildMarkdownStyleSheet(),
               builders: buildCodeBlockBuilders(),
               selectable: true,
+              sizedImageBuilder: (MarkdownImageConfig config) => _TappableImage(uri: config.uri),
             ),
+    );
+  }
+}
+
+class _TappableImage extends StatelessWidget {
+  final Uri uri;
+  const _TappableImage({required this.uri});
+
+  void _showLightbox(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (_) => GestureDetector(
+        onTap: () => Navigator.of(context, rootNavigator: true).pop(),
+        child: Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(16),
+          child: InteractiveViewer(
+            child: Image.network(uri.toString()),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => _showLightbox(context),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.network(
+          uri.toString(),
+          errorBuilder: (_, _, _) => const Icon(
+            Icons.broken_image,
+            color: AppColors.textMuted,
+          ),
+        ),
+      ),
     );
   }
 }

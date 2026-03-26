@@ -7,8 +7,9 @@ final _uuid = Uuid();
 
 class ThreadsNotifier extends StateNotifier<List<ThreadModel>> {
   final ThreadsRepository _repo;
+  final Ref _ref;
 
-  ThreadsNotifier(this._repo) : super([]) {
+  ThreadsNotifier(this._repo, this._ref) : super([]) {
     loadThreads();
   }
 
@@ -26,6 +27,13 @@ class ThreadsNotifier extends StateNotifier<List<ThreadModel>> {
     );
     await _repo.saveThread(thread);
     loadThreads();
+    // Highlight the new thread briefly
+    _ref.read(newlyCreatedThreadIdProvider.notifier).state = thread.id;
+    Future.delayed(const Duration(seconds: 2), () {
+      if (_ref.read(newlyCreatedThreadIdProvider) == thread.id) {
+        _ref.read(newlyCreatedThreadIdProvider.notifier).state = null;
+      }
+    });
     return thread;
   }
 
@@ -36,6 +44,11 @@ class ThreadsNotifier extends StateNotifier<List<ThreadModel>> {
 
   Future<void> updateTitle(String id, String title) async {
     await _repo.updateTitle(id, title);
+    loadThreads();
+  }
+
+  Future<void> updatePreview(String id, String preview) async {
+    await _repo.updatePreview(id, preview);
     loadThreads();
   }
 
@@ -50,7 +63,9 @@ final threadsRepositoryProvider = Provider<ThreadsRepository>((ref) {
 });
 
 final threadsProvider = StateNotifierProvider<ThreadsNotifier, List<ThreadModel>>((ref) {
-  return ThreadsNotifier(ref.watch(threadsRepositoryProvider));
+  return ThreadsNotifier(ref.watch(threadsRepositoryProvider), ref);
 });
 
 final selectedThreadIdProvider = StateProvider<String?>((ref) => null);
+
+final newlyCreatedThreadIdProvider = StateProvider<String?>((ref) => null);

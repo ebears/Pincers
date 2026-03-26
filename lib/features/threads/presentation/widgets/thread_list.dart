@@ -42,28 +42,41 @@ class _ThreadListState extends ConsumerState<ThreadList> {
   }
 
   void _confirmDelete(String id) {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
         backgroundColor: AppColors.bgTertiary,
-        title: Text('Delete conversation?', style: AppTypography.threadTitle.copyWith(fontSize: 16)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              final selectedId = ref.read(selectedThreadIdProvider);
-              await ref.read(threadsProvider.notifier).deleteThread(id);
-              if (selectedId == id) {
-                ref.read(selectedThreadIdProvider.notifier).state = null;
-              }
-            },
-            child: const Text('Delete', style: TextStyle(color: AppColors.error)),
-          ),
-        ],
+        duration: const Duration(seconds: 5),
+        content: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Delete conversation?',
+              style: AppTypography.threadTitle.copyWith(fontWeight: FontWeight.normal),
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextButton(
+                  onPressed: () =>
+                      ScaffoldMessenger.of(context).hideCurrentSnackBar(),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                    final selectedId = ref.read(selectedThreadIdProvider);
+                    await ref.read(threadsProvider.notifier).deleteThread(id);
+                    if (selectedId == id) {
+                      ref.read(selectedThreadIdProvider.notifier).state = null;
+                    }
+                  },
+                  child: const Text('Delete',
+                      style: TextStyle(color: AppColors.error)),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
