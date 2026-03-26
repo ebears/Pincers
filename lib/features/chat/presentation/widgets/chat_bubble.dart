@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/utils/time_utils.dart';
 import '../../../../core/utils/markdown_utils.dart';
 import '../../data/models/message_model.dart';
+import 'agent_avatar.dart';
 
-class ChatBubble extends StatelessWidget {
+class ChatBubble extends ConsumerWidget {
   final MessageModel message;
   final DateTime? previousMessageTime;
 
@@ -18,7 +20,7 @@ class ChatBubble extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final showTimestamp = TimeUtils.shouldShowTimestamp(previousMessageTime, message.createdAt);
     final isUser = message.isUser;
 
@@ -46,12 +48,30 @@ class ChatBubble extends StatelessWidget {
                   (isUser
                       ? AppConstants.bubbleMaxWidthFraction
                       : AppConstants.botBubbleMaxWidthFraction);
+              if (isUser) {
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: maxWidth),
+                      child: _BubbleContent(message: message, isUser: true),
+                    ),
+                  ],
+                );
+              }
+              // Bot message: avatar to the left.
               return Row(
-                mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  const Padding(
+                    padding: EdgeInsets.only(top: 2, right: AppConstants.space8),
+                    child: AgentAvatar(size: 28),
+                  ),
                   ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: maxWidth),
-                    child: _BubbleContent(message: message, isUser: isUser),
+                    constraints: BoxConstraints(
+                        maxWidth: maxWidth - 28 - AppConstants.space8),
+                    child: _BubbleContent(message: message, isUser: false),
                   ),
                 ],
               );

@@ -5,6 +5,8 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../threads/presentation/providers/threads_provider.dart';
 import '../providers/chat_provider.dart';
+import '../providers/agent_identity_provider.dart';
+import 'agent_avatar.dart';
 
 class ChatHeader extends ConsumerStatefulWidget {
   const ChatHeader({super.key});
@@ -156,6 +158,8 @@ class _ChatHeaderState extends ConsumerState<ChatHeader> {
               tooltip: 'Cancel',
             ),
           ] else ...[
+            _AgentIdentityBadge(),
+            const SizedBox(width: AppConstants.space8),
             _VerboseToggleButton(),
             const SizedBox(width: AppConstants.space4),
             PopupMenuButton<_ChatMenuAction>(
@@ -211,6 +215,35 @@ class _ChatHeaderState extends ConsumerState<ChatHeader> {
 }
 
 enum _ChatMenuAction { rename, clear }
+
+/// Shows agent avatar (20px) and name in the header.
+class _AgentIdentityBadge extends ConsumerWidget {
+  const _AgentIdentityBadge();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final identity = ref.watch(agentIdentityProvider);
+    final showName = identity.name != AgentIdentity.defaultIdentity.name ||
+        identity.avatar != AgentIdentity.defaultIdentity.avatar;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AgentAvatar(size: 20),
+        if (showName) ...[
+          const SizedBox(width: 6),
+          Text(
+            identity.name,
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+              fontFamily: 'Inter',
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
 
 /// Icon button that toggles verbose tool-call display in the chat.
 class _VerboseToggleButton extends ConsumerWidget {
