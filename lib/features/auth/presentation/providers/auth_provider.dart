@@ -169,10 +169,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
               'minProtocol': 3,
               'maxProtocol': 3,
               'client': {
-                'id': 'pincers',
+                'id': 'webchat',
                 'version': '1.0.0',
                 'platform': 'flutter',
-                'mode': 'operator',
+                'mode': 'webchat',
               },
               'role': 'operator',
               'scopes': ['operator.read', 'operator.write'],
