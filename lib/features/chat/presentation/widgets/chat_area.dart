@@ -184,28 +184,36 @@ class _ChatAreaState extends ConsumerState<ChatArea> {
               ),
             ),
             if (_hasError)
-              GestureDetector(
+              InkWell(
                 onTap: _retry,
                 child: Container(
-                  color: AppColors.error.withValues(alpha: 0.15),
+                  color: Theme.of(context).colorScheme.error.withValues(alpha: 0.15),
                   padding: const EdgeInsets.symmetric(
                     horizontal: AppConstants.space16,
                     vertical: AppConstants.space8,
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.error_outline,
-                          color: AppColors.error, size: 16),
+                      Icon(
+                        Icons.error_outline,
+                        color: Theme.of(context).colorScheme.error,
+                        size: 16,
+                      ),
                       const SizedBox(width: AppConstants.space8),
                       Expanded(
                         child: Text(
                           "Couldn't send. Click to retry.",
-                          style: TextStyle(color: AppColors.error, fontSize: 13),
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.close,
-                            size: 16, color: AppColors.error),
+                        icon: Icon(
+                          Icons.close,
+                          size: 16,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
                         onPressed: () => setState(() => _hasError = false),
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),

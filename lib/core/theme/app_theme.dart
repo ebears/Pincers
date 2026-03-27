@@ -264,6 +264,14 @@ class AppTheme {
         indicatorColor: AppColors.accentGlow,
         elevation: 0,
       ),
+
+      // ── Drawer ────────────────────────────────────────────────────────────
+      drawerTheme: const DrawerThemeData(
+        backgroundColor: AppColors.bgSecondary,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        scrimColor: Colors.black54,
+      ),
     );
   }
 }

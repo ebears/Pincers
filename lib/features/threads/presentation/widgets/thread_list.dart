@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/utils/time_utils.dart';
 import '../../data/models/thread_model.dart';
@@ -34,14 +32,20 @@ class _ThreadListState extends ConsumerState<ThreadList> {
     final thread = await ref.read(threadsProvider.notifier).createThread();
     ref.read(selectedThreadIdProvider.notifier).state = thread.id;
     ref.read(chatProvider.notifier).loadMessages(thread.id);
+    // Close drawer when running in mobile/tablet mode
+    if (mounted) Scaffold.maybeOf(context)?.closeDrawer();
   }
 
   void _selectThread(ThreadModel thread) {
     ref.read(selectedThreadIdProvider.notifier).state = thread.id;
     ref.read(chatProvider.notifier).loadMessages(thread.id);
+    // Close drawer when running in mobile/tablet mode
+    Scaffold.maybeOf(context)?.closeDrawer();
   }
 
   void _confirmDelete(String id) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         duration: const Duration(seconds: 5),
@@ -50,7 +54,7 @@ class _ThreadListState extends ConsumerState<ThreadList> {
           children: [
             Text(
               'Delete conversation?',
-              style: AppTypography.threadTitle.copyWith(fontWeight: FontWeight.normal),
+              style: textTheme.bodyMedium,
             ),
             Row(
               mainAxisSize: MainAxisSize.min,
@@ -69,8 +73,10 @@ class _ThreadListState extends ConsumerState<ThreadList> {
                       ref.read(selectedThreadIdProvider.notifier).state = null;
                     }
                   },
-                  child: const Text('Delete',
-                      style: TextStyle(color: AppColors.error)),
+                  style: TextButton.styleFrom(
+                    foregroundColor: colorScheme.error,
+                  ),
+                  child: const Text('Delete'),
                 ),
               ],
             ),

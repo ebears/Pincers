@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/utils/time_utils.dart';
 import '../../data/models/thread_model.dart';
@@ -57,32 +55,46 @@ class _ThreadItemState extends ConsumerState<ThreadItem>
 
   @override
   Widget build(BuildContext context) {
-    final isNewlyCreated = ref.watch(newlyCreatedThreadIdProvider) == widget.thread.id;
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final isNewlyCreated =
+        ref.watch(newlyCreatedThreadIdProvider) == widget.thread.id;
+
+    final backgroundColor = isNewlyCreated
+        ? colorScheme.primaryContainer.withValues(alpha: 0.15)
+        : widget.isSelected
+            ? colorScheme.surfaceContainer
+            : Colors.transparent;
 
     return FadeTransition(
       opacity: _opacity,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
-        child: GestureDetector(
+      child: Material(
+        color: backgroundColor,
+        child: InkWell(
           onTap: widget.onTap,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 100),
-            decoration: BoxDecoration(
-              color: isNewlyCreated
-                  ? AppColors.accentGlow
-                  : widget.isSelected
-                      ? AppColors.bgTertiary
-                      : _hovered
-                          ? AppColors.bgHover
-                          : Colors.transparent,
-              border: widget.isSelected
-                  ? const Border(left: BorderSide(color: AppColors.accent, width: 3))
-                  : null,
-            ),
+          onHover: (hovered) => setState(() => _hovered = hovered),
+          mouseCursor: SystemMouseCursors.click,
+          overlayColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.pressed)) {
+              return colorScheme.primary.withValues(alpha: 0.08);
+            }
+            if (states.contains(WidgetState.hovered)) {
+              return colorScheme.surfaceContainerHighest.withValues(alpha: 0.6);
+            }
+            return Colors.transparent;
+          }),
+          child: Container(
+            decoration: widget.isSelected
+                ? BoxDecoration(
+                    border: Border(
+                      left: BorderSide(color: colorScheme.primary, width: 3),
+                    ),
+                  )
+                : null,
             padding: EdgeInsets.only(
-              left: widget.isSelected ? AppConstants.space16 - 3 : AppConstants.space16,
+              left: widget.isSelected
+                  ? AppConstants.space16 - 3
+                  : AppConstants.space16,
               right: AppConstants.space8,
               top: AppConstants.space8,
               bottom: AppConstants.space8,
@@ -96,7 +108,7 @@ class _ThreadItemState extends ConsumerState<ThreadItem>
                     children: [
                       Text(
                         widget.thread.title,
-                        style: AppTypography.threadTitle,
+                        style: textTheme.titleSmall,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -104,8 +116,8 @@ class _ThreadItemState extends ConsumerState<ThreadItem>
                         const SizedBox(height: 1),
                         Text(
                           widget.thread.preview!,
-                          style: AppTypography.threadSubtitle.copyWith(
-                            color: AppColors.textMuted,
+                          style: textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -114,7 +126,7 @@ class _ThreadItemState extends ConsumerState<ThreadItem>
                       const SizedBox(height: 2),
                       Text(
                         TimeUtils.formatThreadTime(widget.thread.updatedAt),
-                        style: AppTypography.threadSubtitle,
+                        style: textTheme.bodySmall,
                       ),
                     ],
                   ),
@@ -123,7 +135,11 @@ class _ThreadItemState extends ConsumerState<ThreadItem>
                   opacity: _hovered ? 1.0 : 0.0,
                   duration: const Duration(milliseconds: 150),
                   child: IconButton(
-                    icon: const Icon(Icons.delete_outline, size: 16, color: AppColors.textSecondary),
+                    icon: Icon(
+                      Icons.delete_outline,
+                      size: 16,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
                     onPressed: widget.onDelete,
                     tooltip: 'Delete conversation',
                     padding: const EdgeInsets.all(AppConstants.space8),

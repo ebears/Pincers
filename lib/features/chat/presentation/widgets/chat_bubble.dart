@@ -62,10 +62,10 @@ class ChatBubble extends ConsumerWidget {
               // Bot message: avatar to the left.
               return Row(
                 mainAxisAlignment: MainAxisAlignment.start,
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   const Padding(
-                    padding: EdgeInsets.only(top: 2, right: AppConstants.space8),
+                    padding: EdgeInsets.only(bottom: 2, right: AppConstants.space8),
                     child: AgentAvatar(size: 28),
                   ),
                   ConstrainedBox(

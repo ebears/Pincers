@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../threads/presentation/providers/threads_provider.dart';
 import '../providers/chat_provider.dart';
@@ -54,30 +52,25 @@ class _ChatHeaderState extends ConsumerState<ChatHeader> {
   }
 
   Future<void> _clearMessages(String threadId) async {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(
-          'Clear messages?',
-          style: AppTypography.threadTitle.copyWith(color: AppColors.textPrimary),
-        ),
+        title: const Text('Clear messages?'),
         content: Text(
           'All messages in this conversation will be deleted. The thread will remain.',
-          style: AppTypography.timestamp.copyWith(
-            color: AppColors.textSecondary,
-            fontSize: 13,
-          ),
+          style: textTheme.bodySmall,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text('Cancel',
-                style: TextStyle(color: AppColors.textSecondary)),
+            child: const Text('Cancel'),
           ),
           TextButton(
+            style: TextButton.styleFrom(foregroundColor: colorScheme.error),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text('Clear',
-                style: TextStyle(color: AppColors.error)),
+            child: const Text('Clear'),
           ),
         ],
       ),
@@ -90,6 +83,8 @@ class _ChatHeaderState extends ConsumerState<ChatHeader> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final threadId = ref.watch(selectedThreadIdProvider);
     if (threadId == null) return const SizedBox.shrink();
 
@@ -99,8 +94,8 @@ class _ChatHeaderState extends ConsumerState<ChatHeader> {
 
     return Container(
       height: 48,
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppColors.border)),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: colorScheme.outline)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: AppConstants.space16),
       child: Row(
@@ -110,11 +105,8 @@ class _ChatHeaderState extends ConsumerState<ChatHeader> {
                 ? TextField(
                     controller: _titleController,
                     focusNode: _focusNode,
-                    style: AppTypography.threadTitle.copyWith(
-                      color: AppColors.textPrimary,
-                      fontSize: 14,
-                    ),
-                    decoration: InputDecoration(
+                    style: textTheme.titleSmall,
+                    decoration: const InputDecoration(
                       border: InputBorder.none,
                       isDense: true,
                       contentPadding: EdgeInsets.zero,
@@ -123,21 +115,18 @@ class _ChatHeaderState extends ConsumerState<ChatHeader> {
                     onEditingComplete: () => _submitTitle(threadId),
                     textInputAction: TextInputAction.done,
                   )
-                : GestureDetector(
+                : InkWell(
                     onTap: () => _startEditing(thread.title),
                     child: Text(
                       thread.title,
-                      style: AppTypography.threadTitle.copyWith(
-                        color: AppColors.textPrimary,
-                        fontSize: 14,
-                      ),
+                      style: textTheme.titleSmall,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
           ),
           if (_editing) ...[
             IconButton(
-              icon: const Icon(Icons.check, size: 18, color: AppColors.accent),
+              icon: Icon(Icons.check, size: 18, color: colorScheme.primary),
               onPressed: () => _submitTitle(threadId),
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
@@ -145,8 +134,7 @@ class _ChatHeaderState extends ConsumerState<ChatHeader> {
             ),
             const SizedBox(width: AppConstants.space8),
             IconButton(
-              icon: const Icon(Icons.close, size: 18,
-                  color: AppColors.textSecondary),
+              icon: Icon(Icons.close, size: 18, color: colorScheme.onSurfaceVariant),
               onPressed: () => setState(() => _editing = false),
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
@@ -158,8 +146,7 @@ class _ChatHeaderState extends ConsumerState<ChatHeader> {
             _VerboseToggleButton(),
             const SizedBox(width: AppConstants.space4),
             PopupMenuButton<_ChatMenuAction>(
-              icon: const Icon(Icons.more_horiz,
-                  size: 20, color: AppColors.textSecondary),
+              icon: Icon(Icons.more_horiz, size: 20, color: colorScheme.onSurfaceVariant),
               onSelected: (action) {
                 switch (action) {
                   case _ChatMenuAction.rename:
@@ -173,8 +160,7 @@ class _ChatHeaderState extends ConsumerState<ChatHeader> {
                   value: _ChatMenuAction.rename,
                   child: Row(
                     children: [
-                      const Icon(Icons.edit_outlined,
-                          size: 16, color: AppColors.textSecondary),
+                      Icon(Icons.edit_outlined, size: 16, color: colorScheme.onSurfaceVariant),
                       const SizedBox(width: AppConstants.space8),
                       const Text('Rename'),
                     ],
@@ -184,11 +170,9 @@ class _ChatHeaderState extends ConsumerState<ChatHeader> {
                   value: _ChatMenuAction.clear,
                   child: Row(
                     children: [
-                      const Icon(Icons.delete_sweep_outlined,
-                          size: 16, color: AppColors.error),
+                      Icon(Icons.delete_sweep_outlined, size: 16, color: colorScheme.error),
                       const SizedBox(width: AppConstants.space8),
-                      Text('Clear messages',
-                          style: TextStyle(color: AppColors.error)),
+                      Text('Clear messages', style: TextStyle(color: colorScheme.error)),
                     ],
                   ),
                 ),
@@ -209,6 +193,8 @@ class _AgentIdentityBadge extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final identity = ref.watch(agentIdentityProvider);
     final showName = identity.name != AgentIdentity.defaultIdentity.name ||
         identity.avatar != AgentIdentity.defaultIdentity.avatar;
@@ -220,10 +206,8 @@ class _AgentIdentityBadge extends ConsumerWidget {
           const SizedBox(width: 6),
           Text(
             identity.name,
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 12,
-              fontFamily: 'Inter',
+            style: textTheme.labelSmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
             ),
           ),
         ],
@@ -238,12 +222,13 @@ class _VerboseToggleButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
     final verboseOn = ref.watch(verboseModeProvider);
     return IconButton(
       icon: Icon(
         Icons.account_tree,
         size: 16,
-        color: verboseOn ? AppColors.accent : AppColors.textMuted,
+        color: verboseOn ? colorScheme.primary : colorScheme.onSurfaceVariant,
       ),
       onPressed: () =>
           ref.read(verboseModeProvider.notifier).state = !verboseOn,

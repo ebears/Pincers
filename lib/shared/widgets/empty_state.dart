@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/theme/app_typography.dart';
 import '../../core/constants/app_constants.dart';
 import '../../features/threads/presentation/providers/threads_provider.dart';
 import '../../features/chat/presentation/providers/chat_provider.dart';
@@ -10,6 +9,8 @@ class EmptyState extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
     final prompts = [
       'Help me with a task',
       'Tell me something interesting',
@@ -24,17 +25,23 @@ class EmptyState extends ConsumerWidget {
           children: [
             const Text('🦞', style: TextStyle(fontSize: 64)),
             const SizedBox(height: AppConstants.space24),
-            Text("Hi, I'm Aralobster.", style: AppTypography.emptyStateTitle),
+            Text("Hi, I'm Aralobster.", style: textTheme.headlineSmall),
             const SizedBox(height: AppConstants.space12),
             Text(
               "I'm your personal assistant — here to help,\nchat, and maybe cause some cheerful chaos.",
-              style: AppTypography.emptyStateBody,
+              style: textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                height: 1.6,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppConstants.space8),
             Text(
               'What would you like to do?',
-              style: AppTypography.emptyStateBody,
+              style: textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                height: 1.6,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppConstants.space32),
@@ -58,6 +65,3 @@ class EmptyState extends ConsumerWidget {
     await ref.read(chatProvider.notifier).sendMessage(thread.id, prompt);
   }
 }
-
-
-

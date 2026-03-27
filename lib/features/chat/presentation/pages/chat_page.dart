@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../threads/presentation/widgets/thread_list.dart';
 import '../../../threads/presentation/providers/threads_provider.dart';
-import '../../../settings/presentation/providers/settings_provider.dart';
 import '../../../settings/presentation/widgets/settings_panel.dart';
 import '../../../../shared/widgets/app_header.dart';
 import '../providers/chat_provider.dart';
@@ -22,7 +20,7 @@ class ChatPage extends ConsumerStatefulWidget {
 }
 
 class _ChatPageState extends ConsumerState<ChatPage> {
-  bool _sidebarVisible = true;
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
   final FocusNode _keyboardFocus = FocusNode();
 
   @override
@@ -58,17 +56,14 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       return KeyEventResult.handled;
     }
 
-    // Escape → close settings panel, or collapse sidebar on mobile/tablet
+    // Escape → close open drawers
     if (event.logicalKey == LogicalKeyboardKey.escape) {
-      final settingsOpen = ref.read(settingsProvider).isPanelOpen;
-      if (settingsOpen) {
-        ref.read(settingsProvider.notifier).togglePanel();
+      if (_scaffoldKey.currentState?.isEndDrawerOpen == true) {
+        _scaffoldKey.currentState?.closeEndDrawer();
         return KeyEventResult.handled;
       }
-      final width = MediaQuery.of(context).size.width;
-      final isDesktop = width >= AppConstants.breakpointDesktop;
-      if (!isDesktop && _sidebarVisible) {
-        setState(() => _sidebarVisible = false);
+      if (_scaffoldKey.currentState?.isDrawerOpen == true) {
+        _scaffoldKey.currentState?.closeDrawer();
         return KeyEventResult.handled;
       }
     }
@@ -118,77 +113,39 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
     final width = MediaQuery.of(context).size.width;
     final isDesktop = width >= AppConstants.breakpointDesktop;
-    final isTablet = width >= AppConstants.breakpointTablet;
     final selectedId = ref.watch(selectedThreadIdProvider);
-    final settingsOpen = ref.watch(settingsProvider).isPanelOpen;
-
-    if (!isTablet && _sidebarVisible && selectedId != null) {
-      _sidebarVisible = false;
-    }
 
     return Focus(
       focusNode: _keyboardFocus,
       autofocus: true,
       onKeyEvent: _handleKeyEvent,
       child: Scaffold(
-        backgroundColor: AppColors.bgPrimary,
-        body: Column(
+        key: _scaffoldKey,
+        appBar: AppHeader(showMenuButton: !isDesktop),
+        // Mobile/tablet: thread list in a standard M3 Drawer
+        drawer: !isDesktop ? const Drawer(child: ThreadList()) : null,
+        // Settings panel as an end drawer on all screen sizes
+        endDrawer: const Drawer(
+          width: AppConstants.settingsPanelWidth,
+          child: SettingsPanel(),
+        ),
+        body: Row(
           children: [
-            AppHeader(
-              showMenuButton: !isDesktop,
-              onMenuTap: () =>
-                  setState(() => _sidebarVisible = !_sidebarVisible),
-            ),
+            // Desktop: persistent sidebar
+            if (isDesktop)
+              Container(
+                width: AppConstants.sidebarWidth,
+                color: Theme.of(context).colorScheme.surfaceContainerLow,
+                child: const ThreadList(),
+              ),
+            // Chat area
             Expanded(
-              child: Stack(
-                children: [
-                  Row(
-                    children: [
-                      // Sidebar
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        clipBehavior: Clip.hardEdge,
-                        decoration: const BoxDecoration(),
-                        width: (isDesktop ||
-                                (isTablet && _sidebarVisible) ||
-                                (!isTablet && _sidebarVisible))
-                            ? AppConstants.sidebarWidth
-                            : 0,
-                        child: OverflowBox(
-                          maxWidth: AppConstants.sidebarWidth,
-                          alignment: Alignment.centerLeft,
-                          child: Container(
-                            width: AppConstants.sidebarWidth,
-                            color: AppColors.bgSecondary,
-                            child: const ThreadList(),
-                          ),
-                        ),
-                      ),
-                      // Chat area with swipe-right to reveal sidebar on mobile
-                      Expanded(
-                        child: GestureDetector(
-                          onHorizontalDragEnd: !isTablet
-                              ? (details) {
-                                  if (details.primaryVelocity != null &&
-                                      details.primaryVelocity! > 300) {
-                                    setState(() => _sidebarVisible = true);
-                                  }
-                                }
-                              : null,
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 150),
-                            child: KeyedSubtree(
-                              key: ValueKey(selectedId),
-                              child: const ChatArea(),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  // Settings panel overlay
-                  if (settingsOpen) const SettingsPanel(),
-                ],
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 150),
+                child: KeyedSubtree(
+                  key: ValueKey(selectedId),
+                  child: const ChatArea(),
+                ),
               ),
             ),
           ],

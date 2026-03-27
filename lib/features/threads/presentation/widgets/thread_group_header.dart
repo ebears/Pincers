@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/constants/app_constants.dart';
 
 class ThreadGroupHeader extends StatelessWidget {
@@ -17,6 +15,8 @@ class ThreadGroupHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return InkWell(
       onTap: onToggle,
       child: Padding(
@@ -29,13 +29,17 @@ class ThreadGroupHeader extends StatelessWidget {
             Expanded(
               child: Text(
                 label.toUpperCase(),
-                style: AppTypography.sectionLabel,
+                style: textTheme.labelSmall?.copyWith(letterSpacing: 0.6),
               ),
             ),
             AnimatedRotation(
               turns: isCollapsed ? -0.25 : 0,
               duration: const Duration(milliseconds: 150),
-              child: const Icon(Icons.expand_more, size: 16, color: AppColors.textSecondary),
+              child: Icon(
+                Icons.expand_more,
+                size: 16,
+                color: colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),

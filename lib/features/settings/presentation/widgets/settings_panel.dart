@@ -2,81 +2,76 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
-import '../providers/settings_provider.dart';
+import '../../../chat/presentation/providers/agent_identity_provider.dart';
+import '../../../chat/presentation/widgets/agent_avatar.dart';
 
 class SettingsPanel extends ConsumerWidget {
   const SettingsPanel({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final auth = ref.watch(authProvider);
 
-    return Stack(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        GestureDetector(
-          onTap: () => ref.read(settingsProvider.notifier).closePanel(),
-          child: Container(color: Colors.black.withValues(alpha: 0.5)),
-        ),
-        Positioned(
-          right: 0,
-          top: 0,
-          bottom: 0,
-          width: AppConstants.settingsPanelWidth,
-          child: Container(
-            color: AppColors.bgSecondary,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(AppConstants.space16),
-                  child: Row(
-                    children: [
-                      Text('Settings', style: AppTypography.emptyStateTitle.copyWith(fontSize: 16)),
-                      const Spacer(),
-                      IconButton(
-                        icon: const Icon(Icons.close, color: AppColors.textSecondary),
-                        onPressed: () => ref.read(settingsProvider.notifier).closePanel(),
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(color: AppColors.border),
-                _Section(
-                  title: 'Account',
-                  children: [
-                    _InfoRow(label: 'Gateway', value: auth.gatewayUrl ?? '—'),
-                    const SizedBox(height: AppConstants.space8),
-                    _CopyableTokenRow(
-                      token: auth.token,
-                    ),
-                    const SizedBox(height: AppConstants.space16),
-                    TextButton.icon(
-                      onPressed: () async {
-                        await ref.read(authProvider.notifier).clearCredentials();
-                        ref.read(settingsProvider.notifier).closePanel();
-                        if (context.mounted) context.go('/auth');
-                      },
-                      icon: const Icon(Icons.logout, size: 16, color: AppColors.error),
-                      label: const Text('Sign out', style: TextStyle(color: AppColors.error)),
-                    ),
-                  ],
-                ),
-                const Divider(color: AppColors.border),
-                _Section(
-                  title: 'About',
-                  children: [
-                    _InfoRow(label: 'App', value: 'Pincers v1.0.0'),
-                    const SizedBox(height: AppConstants.space4),
-                    _InfoRow(label: 'Agent', value: 'Aralobster 🦞'),
-                  ],
-                ),
-              ],
-            ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppConstants.space16,
+            AppConstants.space16,
+            AppConstants.space8,
+            AppConstants.space16,
           ),
+          child: Row(
+            children: [
+              Text(
+                'Settings',
+                style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.of(context).pop(),
+                tooltip: 'Close',
+              ),
+            ],
+          ),
+        ),
+        Divider(color: colorScheme.outline, height: 1),
+        _Section(
+          title: 'ACCOUNT',
+          children: [
+            _InfoRow(label: 'Gateway', value: auth.gatewayUrl ?? '—'),
+            const SizedBox(height: AppConstants.space8),
+            _CopyableTokenRow(token: auth.token),
+            const SizedBox(height: AppConstants.space16),
+            TextButton.icon(
+              style: TextButton.styleFrom(
+                foregroundColor: colorScheme.error,
+              ),
+              onPressed: () async {
+                await ref.read(authProvider.notifier).clearCredentials();
+                if (!context.mounted) return;
+                Navigator.of(context).pop();
+                context.go('/auth');
+              },
+              icon: const Icon(Icons.logout, size: 16),
+              label: const Text('Sign out'),
+            ),
+          ],
+        ),
+        Divider(color: colorScheme.outline, height: 1),
+        _Section(
+          title: 'ABOUT',
+          children: [
+            _InfoRow(label: 'App', value: 'Pincers v1.0.0'),
+            const SizedBox(height: AppConstants.space12),
+            _AgentRow(),
+          ],
         ),
       ],
     );
@@ -90,12 +85,16 @@ class _Section extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Padding(
       padding: const EdgeInsets.all(AppConstants.space16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title.toUpperCase(), style: AppTypography.sectionLabel),
+          Text(
+            title,
+            style: textTheme.labelSmall?.copyWith(letterSpacing: 0.6),
+          ),
           const SizedBox(height: AppConstants.space12),
           ...children,
         ],
@@ -111,11 +110,21 @@ class _InfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(width: 60, child: Text(label, style: AppTypography.settingsLabel)),
-        Expanded(child: Text(value, style: AppTypography.settingsValue)),
+        SizedBox(
+          width: 60,
+          child: Text(
+            label,
+            style: textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        Expanded(child: Text(value, style: textTheme.bodyMedium)),
       ],
     );
   }
@@ -149,23 +158,64 @@ class _CopyableTokenRowState extends State<_CopyableTokenRow> {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        SizedBox(width: 60, child: Text('Token', style: AppTypography.settingsLabel)),
-        Expanded(child: Text(_masked, style: AppTypography.settingsValue)),
+        SizedBox(
+          width: 60,
+          child: Text(
+            'Token',
+            style: textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        Expanded(child: Text(_masked, style: textTheme.bodyMedium)),
         if (widget.token != null)
           IconButton(
             onPressed: _copy,
             icon: Icon(
               _copied ? Icons.check : Icons.copy,
               size: 14,
-              color: _copied ? AppColors.success : AppColors.textSecondary,
+              color: _copied ? colorScheme.primary : colorScheme.onSurfaceVariant,
             ),
             tooltip: _copied ? 'Copied!' : 'Copy token',
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
           ),
+      ],
+    );
+  }
+}
+
+/// Displays the live agent identity (avatar + name) fetched from the gateway.
+class _AgentRow extends ConsumerWidget {
+  const _AgentRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+    final identity = ref.watch(agentIdentityProvider);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: 60,
+          child: Text(
+            'Agent',
+            style: textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        AgentAvatar(size: 24),
+        const SizedBox(width: AppConstants.space8),
+        Expanded(
+          child: Text(identity.name, style: textTheme.bodyMedium),
+        ),
       ],
     );
   }
