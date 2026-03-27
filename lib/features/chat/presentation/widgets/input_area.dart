@@ -216,7 +216,7 @@ class _InputAreaState extends ConsumerState<InputArea> {
                             minLines: 1,
                             style: AppTypography.inputText,
                             decoration: const InputDecoration(
-                              hintText: 'Message Aralobster...',
+                              hintText: 'Message agent...',
                               border: InputBorder.none,
                               enabledBorder: InputBorder.none,
                               focusedBorder: InputBorder.none,

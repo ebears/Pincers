@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_constants.dart';
 import '../../features/threads/presentation/providers/threads_provider.dart';
 import '../../features/chat/presentation/providers/chat_provider.dart';
+import '../../features/chat/presentation/providers/agent_identity_provider.dart';
 
 class EmptyState extends ConsumerWidget {
   const EmptyState({super.key});
@@ -11,6 +12,7 @@ class EmptyState extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
+    final agentIdentity = ref.watch(agentIdentityProvider);
     final prompts = [
       'Help me with a task',
       'Tell me something interesting',
@@ -23,9 +25,9 @@ class EmptyState extends ConsumerWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('🦞', style: TextStyle(fontSize: 64)),
+            Text(agentIdentity.emoji ?? '🤖', style: const TextStyle(fontSize: 64)),
             const SizedBox(height: AppConstants.space24),
-            Text("Hi, I'm Aralobster.", style: textTheme.headlineSmall),
+            Text("Hi, I'm ${agentIdentity.name}.", style: textTheme.headlineSmall),
             const SizedBox(height: AppConstants.space12),
             Text(
               "I'm your personal assistant — here to help,\nchat, and maybe cause some cheerful chaos.",

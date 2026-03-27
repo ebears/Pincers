@@ -115,13 +115,10 @@ class _ChatHeaderState extends ConsumerState<ChatHeader> {
                     onEditingComplete: () => _submitTitle(threadId),
                     textInputAction: TextInputAction.done,
                   )
-                : InkWell(
-                    onTap: () => _startEditing(thread.title),
-                    child: Text(
-                      thread.title,
-                      style: textTheme.titleSmall,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                : Text(
+                    thread.title,
+                    style: textTheme.titleSmall,
+                    overflow: TextOverflow.ellipsis,
                   ),
           ),
           if (_editing) ...[

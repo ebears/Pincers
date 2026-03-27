@@ -79,10 +79,10 @@ class _TokenEntryPageState extends ConsumerState<TokenEntryPage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text('🦞', style: TextStyle(fontSize: 64), textAlign: TextAlign.center),
+                  const Text('🔗', style: TextStyle(fontSize: 64), textAlign: TextAlign.center),
                   const SizedBox(height: AppConstants.space24),
                   Text(
-                    'Connect to Aralobster',
+                    'Connect to your Gateway',
                     style: textTheme.headlineSmall,
                     textAlign: TextAlign.center,
                   ),

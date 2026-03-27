@@ -35,7 +35,7 @@ class SettingsPanel extends ConsumerWidget {
               const Spacer(),
               IconButton(
                 icon: const Icon(Icons.close),
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: () => context.pop(),
                 tooltip: 'Close',
               ),
             ],
@@ -56,7 +56,7 @@ class SettingsPanel extends ConsumerWidget {
               onPressed: () async {
                 await ref.read(authProvider.notifier).clearCredentials();
                 if (!context.mounted) return;
-                Navigator.of(context).pop();
+                context.pop();
                 context.go('/auth');
               },
               icon: const Icon(Icons.logout, size: 16),

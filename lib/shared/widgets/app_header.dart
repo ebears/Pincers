@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_constants.dart';
-import '../../features/chat/presentation/widgets/agent_avatar.dart';
 
 class AppHeader extends ConsumerWidget implements PreferredSizeWidget {
   final bool showMenuButton;
@@ -27,7 +26,7 @@ class AppHeader extends ConsumerWidget implements PreferredSizeWidget {
       title: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          AgentAvatar(size: 24),
+          const Text('🦞', style: TextStyle(fontSize: 20)),
           const SizedBox(width: AppConstants.space8),
           Text(
             'Pincers',
@@ -37,7 +36,7 @@ class AppHeader extends ConsumerWidget implements PreferredSizeWidget {
       ),
       actions: [
         IconButton(
-          icon: const Icon(Icons.settings_outlined, size: 20),
+          icon: const Icon(Icons.settings_rounded, size: 20),
           onPressed: () => Scaffold.of(context).openEndDrawer(),
           tooltip: 'Settings',
         ),

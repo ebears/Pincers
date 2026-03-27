@@ -70,6 +70,8 @@ class WebSocketService {
     _setStatus(ConnectionStatus.connecting);
     _cancelAllPending('Connection reset');
     try {
+      if (_gatewayUrl == null) throw StateError('gatewayUrl not set before connect');
+      if (_token == null) throw StateError('token not set before connect');
       final uri = Uri.parse(_gatewayUrl!);
       _channel = await createChannel(uri);
       _reconnectAttempt = 0;

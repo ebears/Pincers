@@ -100,9 +100,14 @@ class GatewayNotifier extends StateNotifier<GatewayState> {
     try {
       await _deviceIdentity.ensureInitialized();
       debugPrint('[Pincers] Device identity ready (id: ${_deviceIdentity.deviceId})');
+      final gatewayUrl = auth.gatewayUrl;
+      final token = auth.token;
+      if (gatewayUrl == null || token == null) {
+        throw StateError('gatewayUrl or token is null despite isAuthenticated=true');
+      }
       final hello = await _ws.connect(
-        auth.gatewayUrl!,
-        auth.token!,
+        gatewayUrl,
+        token,
         deviceIdentity: _deviceIdentity,
       );
       debugPrint('[Pincers] Gateway connected (connId: ${hello.connId})');

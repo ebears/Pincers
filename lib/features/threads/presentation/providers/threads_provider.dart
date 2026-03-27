@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../data/models/thread_model.dart';
@@ -8,9 +9,16 @@ final _uuid = Uuid();
 class ThreadsNotifier extends StateNotifier<List<ThreadModel>> {
   final ThreadsRepository _repo;
   final Ref _ref;
+  Timer? _highlightTimer;
 
   ThreadsNotifier(this._repo, this._ref) : super([]) {
     loadThreads();
+  }
+
+  @override
+  void dispose() {
+    _highlightTimer?.cancel();
+    super.dispose();
   }
 
   void loadThreads() {
@@ -29,7 +37,8 @@ class ThreadsNotifier extends StateNotifier<List<ThreadModel>> {
     loadThreads();
     // Highlight the new thread briefly
     _ref.read(newlyCreatedThreadIdProvider.notifier).state = thread.id;
-    Future.delayed(const Duration(seconds: 2), () {
+    _highlightTimer?.cancel();
+    _highlightTimer = Timer(const Duration(seconds: 2), () {
       if (_ref.read(newlyCreatedThreadIdProvider) == thread.id) {
         _ref.read(newlyCreatedThreadIdProvider.notifier).state = null;
       }
