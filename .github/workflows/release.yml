@@ -54,7 +54,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: windows-release
-          path: build/windows/runner/Release/
+          path: build/windows/x64/runner/Release/
 
   create-release:
     name: Create GitHub Release
