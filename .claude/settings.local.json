@@ -5,7 +5,8 @@
       "Bash(flutter analyze:*)",
       "Bash(ls *.ts)",
       "Bash(flutter test:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(gh run:*)"
     ]
   }
 }
