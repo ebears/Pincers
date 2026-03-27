@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: cirrus-actions/setup-flutter@v1
+      - uses: subosito/flutter-action@v2.23.0
       - run: flutter pub get
       - run: flutter analyze
 
@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: cirrus-actions/setup-flutter@v1
+      - uses: subosito/flutter-action@v2.23.0
       - run: flutter pub get
       - run: flutter test
 
@@ -34,7 +34,7 @@ jobs:
     needs: [analyze, test]
     steps:
       - uses: actions/checkout@v4
-      - uses: cirrus-actions/setup-flutter@v1
+      - uses: subosito/flutter-action@v2.23.0
       - run: flutter pub get
       - run: flutter build apk --release
       - uses: actions/upload-artifact@v4
@@ -48,7 +48,7 @@ jobs:
     needs: [analyze, test]
     steps:
       - uses: actions/checkout@v4
-      - uses: cirrus-actions/setup-flutter@v1
+      - uses: subosito/flutter-action@v2.23.0
       - run: flutter pub get
       - run: flutter build windows --release
       - uses: actions/upload-artifact@v4
