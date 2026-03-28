@@ -258,7 +258,12 @@ class _DisplayNameRowState extends ConsumerState<_DisplayNameRow> {
   }
 
   Future<void> _save() async {
-    await ref.read(userProfileProvider.notifier).updateName(_controller.text);
+    final notifier = ref.read(userProfileProvider.notifier);
+    if (notifier.hasProfile) {
+      await notifier.updateName(_controller.text);
+    } else {
+      await notifier.save(_controller.text);
+    }
     setState(() => _isEditing = false);
   }
 

@@ -19,7 +19,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       if (authState.isLoading) return null;
 
-      // No profile yet → onboarding
+      // If authenticated but has no profile (shouldn't happen in normal flow,
+      // but guards against redirect loop during state transitions), stay put.
+      if (authState.isAuthenticated && !hasProfile) return null;
+
+      // No profile yet → onboarding (only if not already there)
       if (!hasProfile && state.matchedLocation != '/setup') {
         return '/setup';
       }

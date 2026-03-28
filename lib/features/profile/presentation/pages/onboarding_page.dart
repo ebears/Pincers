@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/user_profile_provider.dart';
@@ -40,7 +39,8 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
         _tokenController.text.trim(),
       );
       await ref.read(userProfileProvider.notifier).save(_nameController.text.trim());
-      if (mounted) context.go('/');
+      // Navigation is handled by the router's redirect — when both auth and profile
+      // are saved, the redirect fires and navigates to /.
     } on AuthException catch (e) {
       setState(() {
         _errorMessage = _messageForFailure(e.reason);
